@@ -11,9 +11,11 @@ interface SortableSessionProps {
   session: PlannedSession;
   subject?: Subject;
   topic?: Topic;
+  allSubjects?: Subject[];
+  allTopics?: Topic[];
 }
 
-export function SortableSession({ session, subject, topic }: SortableSessionProps) {
+export function SortableSession({ session, subject, topic, allSubjects, allTopics }: SortableSessionProps) {
   const {
     attributes,
     listeners,
@@ -52,7 +54,13 @@ export function SortableSession({ session, subject, topic }: SortableSessionProp
         <GripVertical className="h-4 w-4 text-muted-foreground" />
       </div>
       <div className="pl-5">
-        <SessionCard session={session} subject={subject} topic={topic} />
+        <SessionCard
+          session={session}
+          subject={subject}
+          topic={topic}
+          allSubjects={allSubjects}
+          allTopics={allTopics}
+        />
       </div>
     </div>
   );

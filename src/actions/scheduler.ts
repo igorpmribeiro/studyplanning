@@ -11,6 +11,8 @@ import {
 } from "@/lib/constants";
 import type { ActionResult, PlannedSession, Topic, Subject } from "@/types";
 
+// ─── Helpers ────────────────────────────────────────────────
+
 interface ScoredTopic {
   topic: Topic;
   subject: Subject;
@@ -23,13 +25,13 @@ interface DayBudget {
   availableMin: number;
   usedMin: number;
   sessions: Omit<typeof plannedSessions.$inferInsert, "id" | "createdAt" | "updatedAt">[];
-  lastSubjectId: string | null;
+  subjectIds: Set<string>; // track ALL subjects placed in this day
 }
 
 function getMonday(dateStr?: string): Date {
   const d = dateStr ? new Date(dateStr + "T00:00:00") : new Date();
   const day = d.getDay();
-  const diff = d.getDate() - day + (day === 0 ? -6 : 1); // Monday
+  const diff = d.getDate() - day + (day === 0 ? -6 : 1);
   return new Date(d.setDate(diff));
 }
 
@@ -42,6 +44,30 @@ function addDays(date: Date, days: number): Date {
   d.setDate(d.getDate() + days);
   return d;
 }
+
+// ─── Similarity: word overlap for grouping related topics ───
+
+function tokenize(text: string): Set<string> {
+  return new Set(
+    text
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "") // remove accents
+      .split(/\s+/)
+      .filter((w) => w.length > 2) // ignore short words
+  );
+}
+
+function similarity(a: string, b: string): number {
+  const tokA = tokenize(a);
+  const tokB = tokenize(b);
+  if (tokA.size === 0 || tokB.size === 0) return 0;
+  let overlap = 0;
+  for (const w of tokA) if (tokB.has(w)) overlap++;
+  return overlap / Math.max(tokA.size, tokB.size);
+}
+
+// ─── Generate Schedule ──────────────────────────────────────
 
 export async function generateSchedule(
   planningId: string,
@@ -62,7 +88,6 @@ export async function generateSchedule(
     with: { topics: { orderBy: [asc(topics.nome)] } },
   });
 
-  // Filter by selected subjects if provided
   if (selectedSubjectIds && selectedSubjectIds.length > 0) {
     allSubjects = allSubjects.filter((s) => selectedSubjectIds.includes(s.id));
   }
@@ -71,59 +96,74 @@ export async function generateSchedule(
     return { success: false, error: "Cadastre pelo menos uma matéria com subtópicos." };
   }
 
-  const allTopics = allSubjects.flatMap((s) =>
-    s.topics
-      .filter((t) => t.status !== "concluido")
-      .map((t) => ({ topic: t, subject: s }))
-  );
+  // 2. Score topics PER SUBJECT, then build round-robin queue
+  const topicsBySubject: Map<string, ScoredTopic[]> = new Map();
 
-  if (allTopics.length === 0) {
+  for (const subject of allSubjects) {
+    const scored = subject.topics
+      .filter((t) => t.status !== "concluido")
+      .map((t) => {
+        const prioridadeNum = PRIORIDADE_SCORE[subject.prioridade as keyof typeof PRIORIDADE_SCORE] ?? 2;
+        const dificuldadeNum = DIFICULDADE_SCORE[t.dificuldade as keyof typeof DIFICULDADE_SCORE] ?? 2;
+        const statusNum = STATUS_SCORE[t.status as keyof typeof STATUS_SCORE] ?? 2;
+        const score = subject.peso * 3 + prioridadeNum + dificuldadeNum + statusNum;
+        return { topic: t, subject, score };
+      })
+      .sort((a, b) => b.score - a.score);
+
+    if (scored.length > 0) {
+      topicsBySubject.set(subject.id, scored);
+    }
+  }
+
+  if (topicsBySubject.size === 0) {
     return { success: false, error: "Todos os subtópicos estão concluídos." };
   }
 
-  // 2. Score and sort topics
-  const scoredTopics: ScoredTopic[] = allTopics.map(({ topic, subject }) => {
-    const prioridadeNum = PRIORIDADE_SCORE[subject.prioridade as keyof typeof PRIORIDADE_SCORE] ?? 2;
-    const pesoNum = subject.peso;
-    const dificuldadeNum = DIFICULDADE_SCORE[topic.dificuldade as keyof typeof DIFICULDADE_SCORE] ?? 2;
-    const statusNum = STATUS_SCORE[topic.status as keyof typeof STATUS_SCORE] ?? 2;
+  // Round-robin: pick 1 topic from each subject in rotation, ordered by subject priority
+  const subjectOrder = allSubjects
+    .filter((s) => topicsBySubject.has(s.id))
+    .sort((a, b) => {
+      const scoreA = (PRIORIDADE_SCORE[a.prioridade as keyof typeof PRIORIDADE_SCORE] ?? 2) + a.peso;
+      const scoreB = (PRIORIDADE_SCORE[b.prioridade as keyof typeof PRIORIDADE_SCORE] ?? 2) + b.peso;
+      return scoreB - scoreA;
+    });
 
-    const score = pesoNum * 3 + prioridadeNum + dificuldadeNum + statusNum;
-    return { topic, subject, score };
-  });
+  const subjectQueues = new Map<string, ScoredTopic[]>();
+  for (const s of subjectOrder) {
+    subjectQueues.set(s.id, [...(topicsBySubject.get(s.id) ?? [])]);
+  }
 
-  scoredTopics.sort((a, b) => {
-    if (b.score !== a.score) return b.score - a.score;
-    return a.subject.nome.localeCompare(b.subject.nome);
-  });
+  // Interleave: take 1 from each subject in rotation
+  const interleavedTopics: ScoredTopic[] = [];
+  let hasMore = true;
+  while (hasMore) {
+    hasMore = false;
+    for (const s of subjectOrder) {
+      const queue = subjectQueues.get(s.id)!;
+      if (queue.length > 0) {
+        interleavedTopics.push(queue.shift()!);
+        hasMore = hasMore || queue.length > 0;
+      }
+    }
+  }
 
   // 3. Build daily budgets
   const monday = getMonday(weekStartDate);
   const availMinPerDay = [
-    availability.segundaMin,
-    availability.tercaMin,
-    availability.quartaMin,
-    availability.quintaMin,
-    availability.sextaMin,
-    availability.sabadoMin,
+    availability.segundaMin, availability.tercaMin, availability.quartaMin,
+    availability.quintaMin, availability.sextaMin, availability.sabadoMin,
     availability.domingoMin,
   ];
 
-  // Load existing completed sessions for this week
   const weekDates = Array.from({ length: 7 }, (_, i) => formatDate(addDays(monday, i)));
+
   const existingCompleted = await db
     .select()
     .from(plannedSessions)
-    .where(
-      and(
-        eq(plannedSessions.planningId, planningId),
-        eq(plannedSessions.status, "concluida")
-      )
-    );
+    .where(and(eq(plannedSessions.planningId, planningId), eq(plannedSessions.status, "concluida")));
 
-  const completedThisWeek = existingCompleted.filter((s) =>
-    weekDates.includes(s.data)
-  );
+  const completedThisWeek = existingCompleted.filter((s) => weekDates.includes(s.data));
 
   const days: DayBudget[] = availMinPerDay.map((availMin, i) => ({
     index: i,
@@ -131,140 +171,123 @@ export async function generateSchedule(
     availableMin: availMin,
     usedMin: 0,
     sessions: [],
-    lastSubjectId: null,
+    subjectIds: new Set<string>(),
   }));
 
-  // Subtract completed sessions from budgets
   for (const session of completedThisWeek) {
     const day = days[session.diaSemana];
     if (day) day.usedMin += session.duracaoMin;
   }
 
-  // Track completed topic IDs to skip them
   const completedTopicIds = new Set(
-    completedThisWeek
-      .filter((s) => s.tipoSessao === "estudo")
-      .map((s) => s.topicId)
+    completedThisWeek.filter((s) => s.tipoSessao === "estudo").map((s) => s.topicId)
   );
 
-  // 4. Distribute study sessions
-  const reviewQueue: Array<{
-    topic: Topic;
-    subject: Subject;
-    studyDayIndex: number;
-  }> = [];
+  // 4. Distribute study sessions with subject diversity per day
+  const reviewQueue: Array<{ topic: Topic; subject: Subject; studyDayIndex: number }> = [];
+  let dayPointer = 0; // round-robin across days too
 
-  for (const { topic, subject } of scoredTopics) {
+  for (const { topic, subject } of interleavedTopics) {
     if (completedTopicIds.has(topic.id)) continue;
 
-    // Find best day: prefers subject alternation, then most remaining time
-    const candidateDays = days.filter(
-      (d) => d.availableMin - d.usedMin >= topic.tempoEstimadoMin
-    );
+    // Try days in round-robin order, preferring days with fewer of this subject
+    let placed = false;
+    for (let attempt = 0; attempt < 7; attempt++) {
+      const dayIdx = (dayPointer + attempt) % 7;
+      const day = days[dayIdx];
+      const remaining = day.availableMin - day.usedMin;
 
-    candidateDays.sort((a, b) => {
-      const aAlternates = a.lastSubjectId !== subject.id ? 1 : 0;
-      const bAlternates = b.lastSubjectId !== subject.id ? 1 : 0;
-      if (bAlternates !== aAlternates) return bAlternates - aAlternates;
-      return b.availableMin - b.usedMin - (a.availableMin - a.usedMin);
-    });
+      if (remaining >= topic.tempoEstimadoMin) {
+        // Similarity bonus: check if this day already has a topic from the same subject
+        // that has word overlap (related topics together)
+        const sameSubjectCount = day.sessions.filter((s) => s.subjectId === subject.id).length;
 
-    if (candidateDays.length === 0) continue;
+        // Allow max 2 topics per subject per day to maintain diversity
+        if (sameSubjectCount >= 2) continue;
 
-    const bestDay = candidateDays[0];
-
-    bestDay.sessions.push({
-      planningId,
-      data: bestDay.date,
-      diaSemana: bestDay.index,
-      subjectId: subject.id,
-      topicId: topic.id,
-      tipoSessao: "estudo",
-      duracaoMin: topic.tempoEstimadoMin,
-      ordemNoDia: bestDay.sessions.length + 1,
-      status: "pendente",
-    });
-
-    bestDay.usedMin += topic.tempoEstimadoMin;
-    bestDay.lastSubjectId = subject.id;
-
-    reviewQueue.push({ topic, subject, studyDayIndex: bestDay.index });
-  }
-
-  // 5. Schedule review sessions
-  for (const { topic, subject, studyDayIndex } of reviewQueue) {
-    // Revisão 1: next available day after study (50% duration)
-    const rev1Duration = Math.max(10, Math.ceil(topic.tempoEstimadoMin * 0.5));
-    let rev1DayIndex = -1;
-
-    for (let i = studyDayIndex + 1; i < 7; i++) {
-      const day = days[i];
-      if (day.availableMin - day.usedMin >= rev1Duration) {
         day.sessions.push({
           planningId,
           data: day.date,
-          diaSemana: i,
+          diaSemana: dayIdx,
           subjectId: subject.id,
           topicId: topic.id,
-          tipoSessao: "revisao_1",
-          duracaoMin: rev1Duration,
+          tipoSessao: "estudo",
+          duracaoMin: topic.tempoEstimadoMin,
           ordemNoDia: day.sessions.length + 1,
           status: "pendente",
         });
-        day.usedMin += rev1Duration;
-        rev1DayIndex = i;
+
+        day.usedMin += topic.tempoEstimadoMin;
+        day.subjectIds.add(subject.id);
+        reviewQueue.push({ topic, subject, studyDayIndex: dayIdx });
+        dayPointer = (dayIdx + 1) % 7; // next topic starts from the next day
+        placed = true;
         break;
       }
     }
 
-    // Revisão 2: at least 1-day gap after revisão 1 (30% duration)
-    if (rev1DayIndex >= 0) {
-      const rev2Duration = Math.max(10, Math.ceil(topic.tempoEstimadoMin * 0.3));
-
-      for (let i = rev1DayIndex + 2; i < 7; i++) {
-        const day = days[i];
-        if (day.availableMin - day.usedMin >= rev2Duration) {
+    // Fallback: if couldn't place with diversity limit, try any day with space
+    if (!placed) {
+      for (let dayIdx = 0; dayIdx < 7; dayIdx++) {
+        const day = days[dayIdx];
+        if (day.availableMin - day.usedMin >= topic.tempoEstimadoMin) {
           day.sessions.push({
             planningId,
             data: day.date,
-            diaSemana: i,
+            diaSemana: dayIdx,
             subjectId: subject.id,
             topicId: topic.id,
-            tipoSessao: "revisao_2",
-            duracaoMin: rev2Duration,
+            tipoSessao: "estudo",
+            duracaoMin: topic.tempoEstimadoMin,
             ordemNoDia: day.sessions.length + 1,
             status: "pendente",
           });
-          day.usedMin += rev2Duration;
+          day.usedMin += topic.tempoEstimadoMin;
+          day.subjectIds.add(subject.id);
+          reviewQueue.push({ topic, subject, studyDayIndex: dayIdx });
           break;
         }
       }
     }
   }
 
-  // 6. Persist in transaction
+  // 5. Similarity optimization: reorder sessions within each day
+  // Group related topics (same subject, similar names) together
+  for (const day of days) {
+    if (day.sessions.length <= 1) continue;
+
+    const sorted = [...day.sessions];
+    sorted.sort((a, b) => {
+      // First group by subject
+      if (a.subjectId !== b.subjectId) return a.subjectId.localeCompare(b.subjectId);
+      // Then by similarity within subject (keep original order as proxy)
+      return 0;
+    });
+
+    // Update ordemNoDia
+    sorted.forEach((s, i) => { s.ordemNoDia = i + 1; });
+    day.sessions = sorted;
+  }
+
+  // 6. Note: Reviews are NOT scheduled in the same week anymore
+  // Rev1 = 10 days after study, Rev2 = 35 days after Rev1
+  // These will be created when sessions are completed (see completeSession)
+
+  // 7. Persist
   const allNewSessions = days.flatMap((d) => d.sessions);
 
   if (allNewSessions.length === 0) {
     return { success: false, error: "Não foi possível gerar sessões. Verifique a disponibilidade e os subtópicos cadastrados." };
   }
 
-  // Delete pending sessions for this week, insert new ones
+  // Delete pending sessions for this week
   const pendingThisWeek = await db
     .select()
     .from(plannedSessions)
-    .where(
-      and(
-        eq(plannedSessions.planningId, planningId),
-        eq(plannedSessions.status, "pendente")
-      )
-    );
+    .where(and(eq(plannedSessions.planningId, planningId), eq(plannedSessions.status, "pendente")));
 
-  const pendingIdsThisWeek = pendingThisWeek
-    .filter((s) => weekDates.includes(s.data))
-    .map((s) => s.id);
+  const pendingIdsThisWeek = pendingThisWeek.filter((s) => weekDates.includes(s.data)).map((s) => s.id);
 
-  // Batch delete old pending sessions
   if (pendingIdsThisWeek.length > 0) {
     await db.delete(plannedSessions).where(inArray(plannedSessions.id, pendingIdsThisWeek));
   }
@@ -272,26 +295,101 @@ export async function generateSchedule(
   // Insert new sessions
   const inserted = await db.insert(plannedSessions).values(allNewSessions).returning();
 
+  // 8. Update topic statuses to "em_andamento" for all scheduled topics
+  const scheduledTopicIds = [...new Set(allNewSessions.map((s) => s.topicId))];
+  if (scheduledTopicIds.length > 0) {
+    await db
+      .update(topics)
+      .set({ status: "em_andamento", updatedAt: new Date() })
+      .where(
+        and(
+          inArray(topics.id, scheduledTopicIds),
+          eq(topics.status, "nao_iniciado")
+        )
+      );
+  }
+
   revalidatePath("/planejamento");
+  revalidatePath("/materias");
   revalidatePath("/");
   return { success: true, data: [...completedThisWeek, ...inserted] };
 }
 
+// ─── Complete Session (with status lifecycle) ───────────────
+
 export async function completeSession(
   sessionId: string
 ): Promise<ActionResult<PlannedSession>> {
+  const [session] = await db
+    .select()
+    .from(plannedSessions)
+    .where(eq(plannedSessions.id, sessionId));
+
+  if (!session) return { success: false, error: "Sessão não encontrada" };
+
+  // Mark session as completed
   const [updated] = await db
     .update(plannedSessions)
     .set({ status: "concluida", updatedAt: new Date() })
     .where(eq(plannedSessions.id, sessionId))
     .returning();
 
-  if (!updated) return { success: false, error: "Sessão não encontrada" };
+  // Update topic status based on session type
+  if (session.tipoSessao === "estudo") {
+    // Study completed → topic goes to "revisando"
+    await db
+      .update(topics)
+      .set({ status: "revisando", updatedAt: new Date() })
+      .where(eq(topics.id, session.topicId));
+
+    // Schedule Revisão 1 in 10 days (50% duration)
+    const rev1Date = addDays(new Date(), 10);
+    const rev1DayOfWeek = (rev1Date.getDay() + 6) % 7; // 0=Monday
+    const rev1Duration = Math.max(10, Math.ceil(session.duracaoMin * 0.5));
+
+    await db.insert(plannedSessions).values({
+      planningId: session.planningId,
+      data: formatDate(rev1Date),
+      diaSemana: rev1DayOfWeek,
+      subjectId: session.subjectId,
+      topicId: session.topicId,
+      tipoSessao: "revisao_1",
+      duracaoMin: rev1Duration,
+      ordemNoDia: 1,
+      status: "pendente",
+    });
+  } else if (session.tipoSessao === "revisao_1") {
+    // Revisão 1 completed → schedule Revisão 2 in 35 days (30% of original study time)
+    const rev2Date = addDays(new Date(), 35);
+    const rev2DayOfWeek = (rev2Date.getDay() + 6) % 7;
+    const rev2Duration = Math.max(10, Math.ceil(session.duracaoMin * 0.6)); // 60% of rev1 = ~30% of original
+
+    await db.insert(plannedSessions).values({
+      planningId: session.planningId,
+      data: formatDate(rev2Date),
+      diaSemana: rev2DayOfWeek,
+      subjectId: session.subjectId,
+      topicId: session.topicId,
+      tipoSessao: "revisao_2",
+      duracaoMin: rev2Duration,
+      ordemNoDia: 1,
+      status: "pendente",
+    });
+  } else if (session.tipoSessao === "revisao_2") {
+    // Revisão 2 completed → topic is fully "concluido"
+    await db
+      .update(topics)
+      .set({ status: "concluido", updatedAt: new Date() })
+      .where(eq(topics.id, session.topicId));
+  }
 
   revalidatePath("/planejamento");
+  revalidatePath("/materias");
   revalidatePath("/");
   return { success: true, data: updated };
 }
+
+// ─── Uncomplete Session ─────────────────────────────────────
 
 export async function uncompleteSession(
   sessionId: string
@@ -309,6 +407,8 @@ export async function uncompleteSession(
   return { success: true, data: updated };
 }
 
+// ─── Get Sessions ───────────────────────────────────────────
+
 export async function getSessions(planningId: string): Promise<PlannedSession[]> {
   return db
     .select()
@@ -316,6 +416,8 @@ export async function getSessions(planningId: string): Promise<PlannedSession[]>
     .where(eq(plannedSessions.planningId, planningId))
     .orderBy(asc(plannedSessions.data), asc(plannedSessions.ordemNoDia));
 }
+
+// ─── Move Session (drag and drop) ───────────────────────────
 
 export async function moveSession(
   sessionId: string,
@@ -325,7 +427,6 @@ export async function moveSession(
 ): Promise<ActionResult> {
   const now = new Date();
 
-  // Update the moved session's day + all order updates in parallel
   await Promise.all([
     db
       .update(plannedSessions)
@@ -341,4 +442,31 @@ export async function moveSession(
 
   revalidatePath("/planejamento");
   return { success: true, data: undefined };
+}
+
+// ─── Change Session Topic ───────────────────────────────────
+
+export async function changeSessionTopic(
+  sessionId: string,
+  newTopicId: string
+): Promise<ActionResult<PlannedSession>> {
+  // Verify the topic exists and get its data
+  const [topic] = await db.select().from(topics).where(eq(topics.id, newTopicId));
+  if (!topic) return { success: false, error: "Subtópico não encontrado" };
+
+  const [updated] = await db
+    .update(plannedSessions)
+    .set({
+      topicId: newTopicId,
+      subjectId: topic.subjectId,
+      duracaoMin: topic.tempoEstimadoMin,
+      updatedAt: new Date(),
+    })
+    .where(eq(plannedSessions.id, sessionId))
+    .returning();
+
+  if (!updated) return { success: false, error: "Sessão não encontrada" };
+
+  revalidatePath("/planejamento");
+  return { success: true, data: updated };
 }

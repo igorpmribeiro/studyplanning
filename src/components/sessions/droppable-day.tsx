@@ -15,6 +15,8 @@ interface DroppableDayProps {
   sessions: PlannedSession[];
   subjectMap: Map<string, Subject>;
   topicMap: Map<string, Topic>;
+  allSubjects: Subject[];
+  allTopics: Topic[];
   isOver: boolean;
 }
 
@@ -23,6 +25,8 @@ export function DroppableDay({
   sessions,
   subjectMap,
   topicMap,
+  allSubjects,
+  allTopics,
   isOver,
 }: DroppableDayProps) {
   const { setNodeRef } = useDroppable({
@@ -65,6 +69,8 @@ export function DroppableDay({
                 session={session}
                 subject={subjectMap.get(session.subjectId)}
                 topic={topicMap.get(session.topicId)}
+                allSubjects={allSubjects}
+                allTopics={allTopics}
               />
             ))
           )}

@@ -239,6 +239,8 @@ export function WeeklyView({ sessions: initialSessions, subjects, topics, weekDa
             sessions={byDay[dayIndex]}
             subjectMap={subjectMap}
             topicMap={topicMap}
+            allSubjects={subjects}
+            allTopics={topics}
             isOver={overDayIndex === dayIndex}
           />
         ))}

@@ -5,6 +5,7 @@ import { Check, Undo2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { completeSession, uncompleteSession } from "@/actions/scheduler";
+import { EditSessionTopic } from "./edit-session-topic";
 import { toast } from "sonner";
 import { TIPO_SESSAO_LABELS } from "@/lib/constants";
 import type { PlannedSession, Subject, Topic } from "@/types";
@@ -26,9 +27,11 @@ interface SessionCardProps {
   session: PlannedSession;
   subject?: Subject;
   topic?: Topic;
+  allSubjects?: Subject[];
+  allTopics?: Topic[];
 }
 
-export function SessionCard({ session, subject, topic }: SessionCardProps) {
+export function SessionCard({ session, subject, topic, allSubjects, allTopics }: SessionCardProps) {
   const [isPending, startTransition] = useTransition();
   const isCompleted = session.status === "concluida";
 
@@ -39,7 +42,16 @@ export function SessionCard({ session, subject, topic }: SessionCardProps) {
         : await completeSession(session.id);
 
       if (result.success) {
-        toast.success(isCompleted ? "Sessão reaberta" : "Sessão concluída!");
+        const messages: Record<string, string> = {
+          estudo: "Estudo concluído! Revisão 1 agendada para daqui 10 dias.",
+          revisao_1: "Revisão 1 concluída! Revisão 2 agendada para daqui 35 dias.",
+          revisao_2: "Revisão 2 concluída! Subtópico marcado como concluído.",
+        };
+        toast.success(
+          isCompleted
+            ? "Sessão reaberta"
+            : messages[session.tipoSessao] ?? "Sessão concluída!"
+        );
       } else {
         toast.error(result.error);
       }
@@ -49,7 +61,7 @@ export function SessionCard({ session, subject, topic }: SessionCardProps) {
   return (
     <div
       className={cn(
-        "rounded-lg border border-l-4 p-3 transition-all",
+        "group rounded-lg border border-l-4 p-3 transition-all",
         tipoBorderColors[session.tipoSessao],
         isCompleted && "opacity-60"
       )}
@@ -59,9 +71,18 @@ export function SessionCard({ session, subject, topic }: SessionCardProps) {
           <p className={cn("text-sm font-medium truncate", isCompleted && "line-through")}>
             {subject?.nome ?? "—"}
           </p>
-          <p className={cn("text-xs text-muted-foreground truncate", isCompleted && "line-through")}>
-            {topic?.nome ?? "—"}
-          </p>
+          <div className="flex items-center gap-1">
+            <p className={cn("text-xs text-muted-foreground truncate", isCompleted && "line-through")}>
+              {topic?.nome ?? "—"}
+            </p>
+            {!isCompleted && allSubjects && allTopics && (
+              <EditSessionTopic
+                session={session}
+                subjects={allSubjects}
+                topics={allTopics}
+              />
+            )}
+          </div>
           <div className="mt-1.5 flex items-center gap-2">
             <Badge variant="secondary" className={cn("text-xs", tipoColors[session.tipoSessao])}>
               {TIPO_SESSAO_LABELS[session.tipoSessao]}
