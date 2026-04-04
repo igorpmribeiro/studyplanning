@@ -1,6 +1,5 @@
 "use server";
 
-import * as XLSX from "xlsx";
 import { db } from "@/db";
 import { subjects, topics } from "@/db/schema";
 import { revalidatePath } from "next/cache";
@@ -27,6 +26,8 @@ export async function importFromSpreadsheet(
   }
 
   try {
+    // Dynamic import to avoid bundling xlsx (~900KB) in every page
+    const XLSX = await import("xlsx");
     const buffer = await file.arrayBuffer();
     const workbook = XLSX.read(buffer, { type: "array" });
 

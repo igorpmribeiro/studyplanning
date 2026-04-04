@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition, useCallback } from "react";
+import { useState, useEffect, useTransition, useCallback } from "react";
 import {
   DndContext,
   DragOverlay,
@@ -31,6 +31,11 @@ export function WeeklyView({ sessions: initialSessions, subjects, topics, weekDa
   const [sessions, setSessions] = useState(initialSessions);
   const [activeSession, setActiveSession] = useState<PlannedSession | null>(null);
   const [overDayIndex, setOverDayIndex] = useState<number | null>(null);
+
+  // Sync local state when server re-renders with new data
+  useEffect(() => {
+    setSessions(initialSessions);
+  }, [initialSessions]);
   const [, startTransition] = useTransition();
 
   const subjectMap = new Map(subjects.map((s) => [s.id, s]));

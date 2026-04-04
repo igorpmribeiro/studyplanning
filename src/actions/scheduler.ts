@@ -45,7 +45,8 @@ function addDays(date: Date, days: number): Date {
 
 export async function generateSchedule(
   planningId: string,
-  weekStartDate?: string
+  weekStartDate?: string,
+  selectedSubjectIds?: string[]
 ): Promise<ActionResult<PlannedSession[]>> {
   // 1. Load data
   const availability = await db.query.weeklyAvailabilities.findFirst({
@@ -56,10 +57,15 @@ export async function generateSchedule(
     return { success: false, error: "Configure a disponibilidade semanal antes de gerar o planejamento." };
   }
 
-  const allSubjects = await db.query.subjects.findMany({
+  let allSubjects = await db.query.subjects.findMany({
     where: eq(subjects.planningId, planningId),
     with: { topics: { orderBy: [asc(topics.nome)] } },
   });
+
+  // Filter by selected subjects if provided
+  if (selectedSubjectIds && selectedSubjectIds.length > 0) {
+    allSubjects = allSubjects.filter((s) => selectedSubjectIds.includes(s.id));
+  }
 
   if (allSubjects.length === 0) {
     return { success: false, error: "Cadastre pelo menos uma matéria com subtópicos." };
