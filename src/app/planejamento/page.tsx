@@ -8,10 +8,29 @@ import { AvailabilityForm } from "@/components/availability/availability-form";
 import { WeeklyView } from "@/components/sessions/weekly-view";
 import { GenerateButton } from "./generate-button";
 
+function getMonday(): Date {
+  const d = new Date();
+  const day = d.getDay();
+  const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+  return new Date(d.setDate(diff));
+}
+
+function formatDate(date: Date): string {
+  return date.toISOString().split("T")[0];
+}
+
 export default async function PlanejamentoPage() {
   const planning = await getOrCreatePlanning();
   const availability = await getAvailability(planning.id);
   const sessions = await getSessions(planning.id);
+
+  // Calculate week dates for drag and drop
+  const monday = getMonday();
+  const weekDates = Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(monday);
+    d.setDate(d.getDate() + i);
+    return formatDate(d);
+  });
 
   // Load subjects and topics for display in session cards
   const allSubjects = await db
@@ -60,6 +79,7 @@ export default async function PlanejamentoPage() {
           sessions={sessions}
           subjects={allSubjects}
           topics={relevantTopics}
+          weekDates={weekDates}
         />
       </section>
     </div>

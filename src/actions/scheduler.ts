@@ -310,3 +310,31 @@ export async function getSessions(planningId: string): Promise<PlannedSession[]>
     .where(eq(plannedSessions.planningId, planningId))
     .orderBy(asc(plannedSessions.data), asc(plannedSessions.ordemNoDia));
 }
+
+export async function moveSession(
+  sessionId: string,
+  newDiaSemana: number,
+  newDate: string,
+  newOrder: string[]
+): Promise<ActionResult> {
+  // Update the moved session's day
+  await db
+    .update(plannedSessions)
+    .set({
+      diaSemana: newDiaSemana,
+      data: newDate,
+      updatedAt: new Date(),
+    })
+    .where(eq(plannedSessions.id, sessionId));
+
+  // Update order for all sessions in the new order
+  for (let i = 0; i < newOrder.length; i++) {
+    await db
+      .update(plannedSessions)
+      .set({ ordemNoDia: i + 1, updatedAt: new Date() })
+      .where(eq(plannedSessions.id, newOrder[i]));
+  }
+
+  revalidatePath("/planejamento");
+  return { success: true, data: undefined };
+}
