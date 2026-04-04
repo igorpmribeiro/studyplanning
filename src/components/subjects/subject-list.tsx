@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/dialog";
 import { SubjectForm } from "./subject-form";
 import { SubjectCard } from "./subject-card";
+import { ImportButton } from "./import-button";
 import type { SubjectWithTopics } from "@/types";
 
 interface SubjectListProps {
@@ -40,7 +41,9 @@ export function SubjectList({ subjects, planningId }: SubjectListProps) {
         <p className="text-sm text-muted-foreground">
           {subjects.length} {subjects.length === 1 ? "matéria cadastrada" : "matérias cadastradas"}
         </p>
-        <Dialog open={open} onOpenChange={(isOpen) => { if (!isOpen) handleClose(); else setOpen(true); }}>
+        <div className="flex items-center gap-2">
+          <ImportButton planningId={planningId} />
+          <Dialog open={open} onOpenChange={(isOpen) => { if (!isOpen) handleClose(); else setOpen(true); }}>
           <DialogTrigger render={<Button size="sm" />}>
             <Plus className="mr-2 h-4 w-4" />
             Nova Matéria
@@ -63,6 +66,7 @@ export function SubjectList({ subjects, planningId }: SubjectListProps) {
             />
           </DialogContent>
         </Dialog>
+        </div>
       </div>
 
       {subjects.length === 0 ? (
