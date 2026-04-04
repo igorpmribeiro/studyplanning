@@ -1,0 +1,89 @@
+"use client";
+
+import { useTransition } from "react";
+import { Check, Undo2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { completeSession, uncompleteSession } from "@/actions/scheduler";
+import { toast } from "sonner";
+import { TIPO_SESSAO_LABELS } from "@/lib/constants";
+import type { PlannedSession, Subject, Topic } from "@/types";
+import { cn } from "@/lib/utils";
+
+const tipoColors = {
+  estudo: "bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-900 dark:text-blue-300 dark:border-blue-800",
+  revisao_1: "bg-green-100 text-green-800 border-green-200 dark:bg-green-900 dark:text-green-300 dark:border-green-800",
+  revisao_2: "bg-purple-100 text-purple-800 border-purple-200 dark:bg-purple-900 dark:text-purple-300 dark:border-purple-800",
+} as const;
+
+const tipoBorderColors = {
+  estudo: "border-l-blue-500",
+  revisao_1: "border-l-green-500",
+  revisao_2: "border-l-purple-500",
+} as const;
+
+interface SessionCardProps {
+  session: PlannedSession;
+  subject?: Subject;
+  topic?: Topic;
+}
+
+export function SessionCard({ session, subject, topic }: SessionCardProps) {
+  const [isPending, startTransition] = useTransition();
+  const isCompleted = session.status === "concluida";
+
+  function handleToggle() {
+    startTransition(async () => {
+      const result = isCompleted
+        ? await uncompleteSession(session.id)
+        : await completeSession(session.id);
+
+      if (result.success) {
+        toast.success(isCompleted ? "Sessão reaberta" : "Sessão concluída!");
+      } else {
+        toast.error(result.error);
+      }
+    });
+  }
+
+  return (
+    <div
+      className={cn(
+        "rounded-lg border border-l-4 p-3 transition-all",
+        tipoBorderColors[session.tipoSessao],
+        isCompleted && "opacity-60"
+      )}
+    >
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0 flex-1">
+          <p className={cn("text-sm font-medium truncate", isCompleted && "line-through")}>
+            {subject?.nome ?? "—"}
+          </p>
+          <p className={cn("text-xs text-muted-foreground truncate", isCompleted && "line-through")}>
+            {topic?.nome ?? "—"}
+          </p>
+          <div className="mt-1.5 flex items-center gap-2">
+            <Badge variant="secondary" className={cn("text-xs", tipoColors[session.tipoSessao])}>
+              {TIPO_SESSAO_LABELS[session.tipoSessao]}
+            </Badge>
+            <span className="text-xs text-muted-foreground">{session.duracaoMin} min</span>
+          </div>
+        </div>
+
+        <Button
+          variant={isCompleted ? "ghost" : "outline"}
+          size="icon"
+          className="h-7 w-7 shrink-0"
+          onClick={handleToggle}
+          disabled={isPending}
+        >
+          {isCompleted ? (
+            <Undo2 className="h-3.5 w-3.5" />
+          ) : (
+            <Check className="h-3.5 w-3.5" />
+          )}
+        </Button>
+      </div>
+    </div>
+  );
+}

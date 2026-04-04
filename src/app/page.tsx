@@ -1,65 +1,123 @@
-import Image from "next/image";
+import { BookOpen, FileText, CalendarDays, CheckCircle2 } from "lucide-react";
+import { getOrCreatePlanning } from "@/actions/planning";
+import { db } from "@/db";
+import { subjects, topics, plannedSessions } from "@/db/schema";
+import { eq, count } from "drizzle-orm";
 
-export default function Home() {
+export default async function HomePage() {
+  const planning = await getOrCreatePlanning();
+
+  const [subjectCount] = await db
+    .select({ count: count() })
+    .from(subjects)
+    .where(eq(subjects.planningId, planning.id));
+
+  const subjectIds = (
+    await db
+      .select({ id: subjects.id })
+      .from(subjects)
+      .where(eq(subjects.planningId, planning.id))
+  ).map((s) => s.id);
+
+  // Count topics belonging to this planning's subjects
+  const allTopics = await db.select({ id: topics.id, subjectId: topics.subjectId }).from(topics);
+  const topicCount = allTopics.filter((t) => subjectIds.includes(t.subjectId)).length;
+
+  const [sessionCount] = await db
+    .select({ count: count() })
+    .from(plannedSessions)
+    .where(eq(plannedSessions.planningId, planning.id));
+
+  const [completedCount] = await db
+    .select({ count: count() })
+    .from(plannedSessions)
+    .where(eq(plannedSessions.planningId, planning.id));
+
+  // Get actual completed count
+  const allSessions = await db
+    .select({ status: plannedSessions.status })
+    .from(plannedSessions)
+    .where(eq(plannedSessions.planningId, planning.id));
+
+  const totalSessions = allSessions.length;
+  const completedSessions = allSessions.filter((s) => s.status === "concluida").length;
+  const progressPercent = totalSessions > 0 ? Math.round((completedSessions / totalSessions) * 100) : 0;
+
+  const stats = [
+    {
+      label: "Total de Matérias",
+      value: subjectCount.count,
+      icon: BookOpen,
+      color: "text-blue-600 dark:text-blue-400",
+      bg: "bg-blue-50 dark:bg-blue-950",
+    },
+    {
+      label: "Total de Subtópicos",
+      value: topicCount,
+      icon: FileText,
+      color: "text-amber-600 dark:text-amber-400",
+      bg: "bg-amber-50 dark:bg-amber-950",
+    },
+    {
+      label: "Sessões Planejadas",
+      value: totalSessions,
+      icon: CalendarDays,
+      color: "text-purple-600 dark:text-purple-400",
+      bg: "bg-purple-50 dark:bg-purple-950",
+    },
+    {
+      label: "Sessões Concluídas",
+      value: completedSessions,
+      icon: CheckCircle2,
+      color: "text-green-600 dark:text-green-400",
+      bg: "bg-green-50 dark:bg-green-950",
+    },
+  ];
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>
+        <p className="text-muted-foreground">
+          Visão geral do seu planejamento de estudos.
+        </p>
+      </div>
+
+      {/* Stats Grid */}
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        {stats.map((stat) => (
+          <div
+            key={stat.label}
+            className="rounded-xl border bg-card p-5 text-card-foreground shadow-sm"
           >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
+            <div className="flex items-center justify-between">
+              <p className="text-sm text-muted-foreground">{stat.label}</p>
+              <div className={`rounded-lg p-2 ${stat.bg}`}>
+                <stat.icon className={`h-4 w-4 ${stat.color}`} />
+              </div>
+            </div>
+            <p className="mt-2 text-3xl font-bold">{stat.value}</p>
+          </div>
+        ))}
+      </div>
+
+      {/* Progress */}
+      {totalSessions > 0 && (
+        <div className="rounded-xl border bg-card p-5 shadow-sm">
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="font-semibold">Progresso da Semana</h2>
+            <span className="text-sm text-muted-foreground">
+              {completedSessions} de {totalSessions} sessões ({progressPercent}%)
+            </span>
+          </div>
+          <div className="h-3 w-full rounded-full bg-secondary">
+            <div
+              className="h-3 rounded-full bg-primary transition-all duration-500"
+              style={{ width: `${progressPercent}%` }}
             />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+          </div>
         </div>
-      </main>
+      )}
     </div>
   );
 }
