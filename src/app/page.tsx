@@ -2,42 +2,34 @@ import { BookOpen, FileText, CalendarDays, CheckCircle2 } from "lucide-react";
 import { getOrCreatePlanning } from "@/actions/planning";
 import { db } from "@/db";
 import { subjects, topics, plannedSessions } from "@/db/schema";
-import { eq, count } from "drizzle-orm";
+import { eq, count, inArray } from "drizzle-orm";
 
 export default async function HomePage() {
   const planning = await getOrCreatePlanning();
 
-  const [subjectCount] = await db
-    .select({ count: count() })
-    .from(subjects)
-    .where(eq(subjects.planningId, planning.id));
-
-  const subjectIds = (
-    await db
+  // Parallel queries — all depend only on planning.id
+  const [subjectRows, allSessions] = await Promise.all([
+    db
       .select({ id: subjects.id })
       .from(subjects)
-      .where(eq(subjects.planningId, planning.id))
-  ).map((s) => s.id);
+      .where(eq(subjects.planningId, planning.id)),
+    db
+      .select({ status: plannedSessions.status })
+      .from(plannedSessions)
+      .where(eq(plannedSessions.planningId, planning.id)),
+  ]);
 
-  // Count topics belonging to this planning's subjects
-  const allTopics = await db.select({ id: topics.id, subjectId: topics.subjectId }).from(topics);
-  const topicCount = allTopics.filter((t) => subjectIds.includes(t.subjectId)).length;
+  const subjectIds = subjectRows.map((s) => s.id);
+  const subjectCount = subjectIds.length;
 
-  const [sessionCount] = await db
-    .select({ count: count() })
-    .from(plannedSessions)
-    .where(eq(plannedSessions.planningId, planning.id));
-
-  const [completedCount] = await db
-    .select({ count: count() })
-    .from(plannedSessions)
-    .where(eq(plannedSessions.planningId, planning.id));
-
-  // Get actual completed count
-  const allSessions = await db
-    .select({ status: plannedSessions.status })
-    .from(plannedSessions)
-    .where(eq(plannedSessions.planningId, planning.id));
+  // Count topics with SQL filter instead of fetching all into memory
+  const [topicCountResult] = subjectIds.length > 0
+    ? await db
+        .select({ count: count() })
+        .from(topics)
+        .where(inArray(topics.subjectId, subjectIds))
+    : [{ count: 0 }];
+  const topicCount = topicCountResult.count;
 
   const totalSessions = allSessions.length;
   const completedSessions = allSessions.filter((s) => s.status === "concluida").length;
@@ -46,7 +38,7 @@ export default async function HomePage() {
   const stats = [
     {
       label: "Total de Matérias",
-      value: subjectCount.count,
+      value: subjectCount,
       icon: BookOpen,
       color: "text-blue-600 dark:text-blue-400",
       bg: "bg-blue-50 dark:bg-blue-950",

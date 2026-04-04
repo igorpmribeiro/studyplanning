@@ -2,7 +2,7 @@
 
 import { db } from "@/db";
 import { plannedSessions, subjects, topics, weeklyAvailabilities } from "@/db/schema";
-import { eq, and, asc } from "drizzle-orm";
+import { eq, and, asc, inArray } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import {
   PRIORIDADE_SCORE,
@@ -264,9 +264,9 @@ export async function generateSchedule(
     .filter((s) => weekDates.includes(s.data))
     .map((s) => s.id);
 
-  // Delete old pending sessions
-  for (const id of pendingIdsThisWeek) {
-    await db.delete(plannedSessions).where(eq(plannedSessions.id, id));
+  // Batch delete old pending sessions
+  if (pendingIdsThisWeek.length > 0) {
+    await db.delete(plannedSessions).where(inArray(plannedSessions.id, pendingIdsThisWeek));
   }
 
   // Insert new sessions
@@ -323,23 +323,21 @@ export async function moveSession(
   newDate: string,
   newOrder: string[]
 ): Promise<ActionResult> {
-  // Update the moved session's day
-  await db
-    .update(plannedSessions)
-    .set({
-      diaSemana: newDiaSemana,
-      data: newDate,
-      updatedAt: new Date(),
-    })
-    .where(eq(plannedSessions.id, sessionId));
+  const now = new Date();
 
-  // Update order for all sessions in the new order
-  for (let i = 0; i < newOrder.length; i++) {
-    await db
+  // Update the moved session's day + all order updates in parallel
+  await Promise.all([
+    db
       .update(plannedSessions)
-      .set({ ordemNoDia: i + 1, updatedAt: new Date() })
-      .where(eq(plannedSessions.id, newOrder[i]));
-  }
+      .set({ diaSemana: newDiaSemana, data: newDate, updatedAt: now })
+      .where(eq(plannedSessions.id, sessionId)),
+    ...newOrder.map((id, i) =>
+      db
+        .update(plannedSessions)
+        .set({ ordemNoDia: i + 1, updatedAt: now })
+        .where(eq(plannedSessions.id, id))
+    ),
+  ]);
 
   revalidatePath("/planejamento");
   return { success: true, data: undefined };
