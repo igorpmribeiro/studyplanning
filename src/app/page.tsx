@@ -1,3 +1,5 @@
+export const dynamic = "force-dynamic";
+
 import { BookOpen, FileText, CalendarDays, CheckCircle2, Clock, RotateCcw } from "lucide-react";
 import { getOrCreatePlanning } from "@/actions/planning";
 import { db } from "@/db";

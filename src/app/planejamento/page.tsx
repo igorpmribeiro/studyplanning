@@ -1,3 +1,5 @@
+export const dynamic = "force-dynamic";
+
 import { getOrCreatePlanning } from "@/actions/planning";
 import { getAvailability } from "@/actions/availability";
 import { getSubjects } from "@/actions/subjects";
