@@ -2,11 +2,12 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, BookOpen, CalendarDays, GraduationCap } from "lucide-react";
+import { LayoutDashboard, BookOpen, CalendarDays, GraduationCap, Trophy } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const navItems = [
   { href: "/", label: "Home", icon: LayoutDashboard },
+  { href: "/concursos", label: "Concursos", icon: Trophy },
   { href: "/materias", label: "Matérias", icon: BookOpen },
   { href: "/planejamento", label: "Planejamento", icon: CalendarDays },
 ];

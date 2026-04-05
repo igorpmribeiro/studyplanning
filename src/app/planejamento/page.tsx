@@ -49,7 +49,7 @@ export default async function PlanejamentoPage() {
           .select()
           .from(topics)
           .where(inArray(topics.subjectId, subjectIds))
-          .orderBy(asc(topics.nome))
+          .orderBy(asc(topics.ordem), asc(topics.createdAt))
       : [];
 
   return (

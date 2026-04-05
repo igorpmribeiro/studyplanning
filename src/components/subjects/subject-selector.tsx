@@ -26,13 +26,20 @@ export function SubjectSelector({
   onSelectAll,
   onDeselectAll,
 }: SubjectSelectorProps) {
-  const allSelected = selectedIds.length === subjects.length;
+  // Filter out fully-completed subjects
+  const availableSubjects = subjects.filter(
+    (s) => s.topics.some((t) => t.status !== "concluido")
+  );
+  const completedSubjects = subjects.filter(
+    (s) => s.topics.length > 0 && s.topics.every((t) => t.status === "concluido")
+  );
+  const allSelected = selectedIds.length === availableSubjects.length;
 
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
         <p className="text-sm text-muted-foreground">
-          {selectedIds.length} de {subjects.length} selecionadas
+          {selectedIds.length} de {availableSubjects.length} selecionadas
         </p>
         <button
           type="button"
@@ -44,7 +51,7 @@ export function SubjectSelector({
       </div>
 
       <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-        {subjects.map((subject) => {
+        {availableSubjects.map((subject) => {
           const isSelected = selectedIds.includes(subject.id);
           const topicCount = subject.topics.filter(
             (t) => t.status !== "concluido"
@@ -101,10 +108,25 @@ export function SubjectSelector({
         })}
       </div>
 
-      {subjects.length === 0 && (
+      {availableSubjects.length === 0 && (
         <p className="py-4 text-center text-sm text-muted-foreground">
-          Nenhuma matéria cadastrada. Adicione matérias primeiro.
+          Nenhuma materia disponivel. Adicione materias ou verifique seus subtopicos.
         </p>
+      )}
+
+      {completedSubjects.length > 0 && (
+        <div className="mt-3 pt-3 border-t">
+          <p className="text-xs text-muted-foreground mb-1.5">
+            Materias concluidas ({completedSubjects.length}):
+          </p>
+          <div className="flex flex-wrap gap-1.5">
+            {completedSubjects.map((s) => (
+              <Badge key={s.id} variant="secondary" className="text-xs opacity-60 line-through">
+                {s.nome}
+              </Badge>
+            ))}
+          </div>
+        </div>
       )}
     </div>
   );

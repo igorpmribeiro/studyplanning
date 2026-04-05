@@ -10,7 +10,7 @@ import type { ActionResult, Subject, SubjectWithTopics } from "@/types";
 export async function getSubjects(planningId: string): Promise<SubjectWithTopics[]> {
   const results = await db.query.subjects.findMany({
     where: eq(subjects.planningId, planningId),
-    with: { topics: { orderBy: [asc(topics.nome)] } },
+    with: { topics: { orderBy: [asc(topics.ordem), asc(topics.createdAt)] } },
     orderBy: [asc(subjects.nome)],
   });
   return results;
@@ -19,7 +19,7 @@ export async function getSubjects(planningId: string): Promise<SubjectWithTopics
 export async function getSubjectById(id: string): Promise<SubjectWithTopics | null> {
   const result = await db.query.subjects.findFirst({
     where: eq(subjects.id, id),
-    with: { topics: { orderBy: [asc(topics.nome)] } },
+    with: { topics: { orderBy: [asc(topics.ordem), asc(topics.createdAt)] } },
   });
   return result ?? null;
 }

@@ -85,7 +85,7 @@ export async function generateSchedule(
 
   let allSubjects = await db.query.subjects.findMany({
     where: eq(subjects.planningId, planningId),
-    with: { topics: { orderBy: [asc(topics.nome)] } },
+    with: { topics: { orderBy: [asc(topics.ordem), asc(topics.createdAt)] } },
   });
 
   if (selectedSubjectIds && selectedSubjectIds.length > 0) {
@@ -100,6 +100,9 @@ export async function generateSchedule(
   const topicsBySubject: Map<string, ScoredTopic[]> = new Map();
 
   for (const subject of allSubjects) {
+    // Topics arrive pre-sorted by `ordem` (import order = prerequisite order).
+    // We only filter out completed topics; we keep the original order so that
+    // prerequisite topics are scheduled before advanced ones.
     const scored = subject.topics
       .filter((t) => t.status !== "concluido")
       .map((t) => {
@@ -108,8 +111,7 @@ export async function generateSchedule(
         const statusNum = STATUS_SCORE[t.status as keyof typeof STATUS_SCORE] ?? 2;
         const score = subject.peso * 3 + prioridadeNum + dificuldadeNum + statusNum;
         return { topic: t, subject, score };
-      })
-      .sort((a, b) => b.score - a.score);
+      });
 
     if (scored.length > 0) {
       topicsBySubject.set(subject.id, scored);

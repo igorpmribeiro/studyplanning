@@ -1,10 +1,23 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useTransition } from "react";
+import { Plus, Trash2 } from "lucide-react";
 import { AvailabilityForm } from "@/components/availability/availability-form";
 import { SubjectSelector } from "@/components/subjects/subject-selector";
+import { SubjectForm } from "@/components/subjects/subject-form";
 import { WeeklyView } from "@/components/sessions/weekly-view";
 import { GenerateButton } from "./generate-button";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogTrigger,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
+import { deleteSubject } from "@/actions/subjects";
+import { toast } from "sonner";
 import type {
   WeeklyAvailability,
   PlannedSession,
@@ -35,6 +48,8 @@ export function PlanningClient({
   const [selectedIds, setSelectedIds] = useState<string[]>(
     subjects.map((s) => s.id)
   );
+  const [addOpen, setAddOpen] = useState(false);
+  const [isPending, startTransition] = useTransition();
 
   function handleToggle(id: string) {
     setSelectedIds((prev) =>
@@ -50,12 +65,25 @@ export function PlanningClient({
     setSelectedIds([]);
   }
 
+  function handleDeleteSubject(id: string, nome: string) {
+    if (!confirm(`Excluir a materia "${nome}" e todos os seus subtopicos?`)) return;
+    startTransition(async () => {
+      const result = await deleteSubject(id);
+      if (result.success) {
+        toast.success("Materia excluida!");
+        setSelectedIds((prev) => prev.filter((i) => i !== id));
+      } else {
+        toast.error(result.error);
+      }
+    });
+  }
+
   return (
     <div className="space-y-8">
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Planejamento</h1>
         <p className="text-muted-foreground">
-          Configure sua disponibilidade, selecione as matérias e gere seu cronograma semanal.
+          Configure sua disponibilidade, selecione as materias e gere seu cronograma semanal.
         </p>
       </div>
 
@@ -69,10 +97,34 @@ export function PlanningClient({
 
       {/* Seleção de Matérias */}
       <section className="space-y-3">
-        <h2 className="text-lg font-semibold">Matérias da Semana</h2>
-        <p className="text-sm text-muted-foreground">
-          Selecione quais matérias deseja focar nesta semana.
-        </p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-lg font-semibold">Materias da Semana</h2>
+            <p className="text-sm text-muted-foreground">
+              Selecione quais materias deseja focar nesta semana.
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <Dialog open={addOpen} onOpenChange={setAddOpen}>
+              <DialogTrigger render={<Button size="sm" variant="outline" />}>
+                <Plus className="mr-2 h-4 w-4" />
+                Adicionar
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Nova Materia</DialogTitle>
+                  <DialogDescription>
+                    Cadastre uma nova materia no seu planejamento.
+                  </DialogDescription>
+                </DialogHeader>
+                <SubjectForm
+                  planningId={planningId}
+                  onSuccess={() => setAddOpen(false)}
+                />
+              </DialogContent>
+            </Dialog>
+          </div>
+        </div>
         <div className="rounded-xl border bg-card p-5 shadow-sm">
           <SubjectSelector
             subjects={subjects}
@@ -81,6 +133,29 @@ export function PlanningClient({
             onSelectAll={handleSelectAll}
             onDeselectAll={handleDeselectAll}
           />
+          {/* Delete buttons for each subject */}
+          {subjects.length > 0 && (
+            <div className="mt-4 border-t pt-3">
+              <p className="text-xs text-muted-foreground mb-2">
+                Remover materias do planejamento:
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {subjects.map((subject) => (
+                  <Button
+                    key={subject.id}
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 text-xs text-destructive hover:text-destructive hover:bg-destructive/10"
+                    onClick={() => handleDeleteSubject(subject.id, subject.nome)}
+                    disabled={isPending}
+                  >
+                    <Trash2 className="mr-1 h-3 w-3" />
+                    {subject.nome}
+                  </Button>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       </section>
 
@@ -93,7 +168,7 @@ export function PlanningClient({
         />
         {selectedIds.length === 0 && (
           <p className="text-sm text-destructive">
-            Selecione pelo menos uma matéria.
+            Selecione pelo menos uma materia.
           </p>
         )}
       </section>

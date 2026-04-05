@@ -6,7 +6,8 @@ import { ThemeToggle } from "@/components/theme-toggle";
 
 const pageTitles: Record<string, string> = {
   "/": "Dashboard",
-  "/materias": "Matérias",
+  "/concursos": "Concursos",
+  "/materias": "Materias",
   "/planejamento": "Planejamento",
 };
 

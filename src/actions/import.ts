@@ -84,13 +84,14 @@ export async function importFromSpreadsheet(
 
       totalMaterias++;
 
-      // Create all subtopics with default values
-      const topicValues = subtopicNames.map((nome) => ({
+      // Create all subtopics with default values, preserving import order
+      const topicValues = subtopicNames.map((nome, index) => ({
         subjectId: subject.id,
         nome,
         tempoEstimadoMin: 60,
         dificuldade: "media" as const,
         status: "nao_iniciado" as const,
+        ordem: index,
         observacoes: "",
       }));
 

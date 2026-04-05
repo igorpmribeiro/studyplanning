@@ -13,6 +13,27 @@ export const topicStatusEnum = pgEnum("topic_status", [
 export const tipoSessaoEnum = pgEnum("tipo_sessao", ["estudo", "revisao_1", "revisao_2"]);
 export const sessionStatusEnum = pgEnum("session_status", ["pendente", "concluida"]);
 
+// ─── Concursos ──────────────────────────────────────────────
+
+export const concursos = pgTable("concursos", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  planningId: uuid("planning_id")
+    .notNull()
+    .references(() => plannings.id, { onDelete: "cascade" }),
+  nome: text("nome").notNull(),
+  dataProva: text("data_prova"), // ISO date YYYY-MM-DD, nullable
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+export const concursosRelations = relations(concursos, ({ one, many }) => ({
+  planning: one(plannings, {
+    fields: [concursos.planningId],
+    references: [plannings.id],
+  }),
+  subjects: many(subjects),
+}));
+
 // ─── Plannings ──────────────────────────────────────────────
 
 export const plannings = pgTable("plannings", {
@@ -24,6 +45,7 @@ export const plannings = pgTable("plannings", {
 });
 
 export const planningsRelations = relations(plannings, ({ many }) => ({
+  concursos: many(concursos),
   subjects: many(subjects),
   weeklyAvailabilities: many(weeklyAvailabilities),
   plannedSessions: many(plannedSessions),
@@ -36,6 +58,7 @@ export const subjects = pgTable("subjects", {
   planningId: uuid("planning_id")
     .notNull()
     .references(() => plannings.id, { onDelete: "cascade" }),
+  concursoId: uuid("concurso_id").references(() => concursos.id, { onDelete: "set null" }),
   nome: text("nome").notNull(),
   prioridade: prioridadeEnum("prioridade").notNull().default("media"),
   peso: integer("peso").notNull().default(5),
@@ -48,6 +71,10 @@ export const subjectsRelations = relations(subjects, ({ one, many }) => ({
   planning: one(plannings, {
     fields: [subjects.planningId],
     references: [plannings.id],
+  }),
+  concurso: one(concursos, {
+    fields: [subjects.concursoId],
+    references: [concursos.id],
   }),
   topics: many(topics),
 }));
@@ -63,6 +90,7 @@ export const topics = pgTable("topics", {
   tempoEstimadoMin: integer("tempo_estimado_min").notNull().default(30),
   dificuldade: dificuldadeEnum("dificuldade").notNull().default("media"),
   status: topicStatusEnum("status").notNull().default("nao_iniciado"),
+  ordem: integer("ordem").notNull().default(0),
   observacoes: text("observacoes").default(""),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
