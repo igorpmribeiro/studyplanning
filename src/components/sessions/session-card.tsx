@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { completeSession, uncompleteSession } from "@/actions/scheduler";
 import { EditSessionTopic } from "./edit-session-topic";
+import { SessionTimer } from "./session-timer";
 import { toast } from "sonner";
 import { TIPO_SESSAO_LABELS } from "@/lib/constants";
 import type { PlannedSession, Subject, Topic } from "@/types";
@@ -88,22 +89,37 @@ export function SessionCard({ session, subject, topic, allSubjects, allTopics }:
               {TIPO_SESSAO_LABELS[session.tipoSessao]}
             </Badge>
             <span className="text-xs text-muted-foreground">{session.duracaoMin} min</span>
+            {topic && session.duracaoMin < topic.tempoEstimadoMin && (
+              <Badge variant="secondary" className="text-xs bg-amber-100 text-amber-800 border-amber-200 dark:bg-amber-900 dark:text-amber-300 dark:border-amber-800">
+                Parcial
+              </Badge>
+            )}
           </div>
         </div>
 
-        <Button
-          variant={isCompleted ? "ghost" : "outline"}
-          size="icon"
-          className="h-7 w-7 shrink-0"
-          onClick={handleToggle}
-          disabled={isPending}
-        >
-          {isCompleted ? (
-            <Undo2 className="h-3.5 w-3.5" />
-          ) : (
-            <Check className="h-3.5 w-3.5" />
+        <div className="flex flex-col gap-1 shrink-0">
+          {!isCompleted && (
+            <SessionTimer
+              durationMin={session.duracaoMin}
+              subjectName={subject?.nome ?? "—"}
+              topicName={topic?.nome ?? "—"}
+              onComplete={handleToggle}
+            />
           )}
-        </Button>
+          <Button
+            variant={isCompleted ? "ghost" : "outline"}
+            size="icon"
+            className="h-7 w-7 shrink-0"
+            onClick={handleToggle}
+            disabled={isPending}
+          >
+            {isCompleted ? (
+              <Undo2 className="h-3.5 w-3.5" />
+            ) : (
+              <Check className="h-3.5 w-3.5" />
+            )}
+          </Button>
+        </div>
       </div>
     </div>
   );

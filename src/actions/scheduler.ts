@@ -184,25 +184,26 @@ export async function generateSchedule(
   );
 
   // 4. Distribute study sessions with subject diversity per day
+  // Supports splitting topics across multiple days when they don't fit in a single slot
+  const MIN_SESSION_DURATION = 15; // minimum session size when splitting (minutes)
   const reviewQueue: Array<{ topic: Topic; subject: Subject; studyDayIndex: number }> = [];
   let dayPointer = 0; // round-robin across days too
 
   for (const { topic, subject } of interleavedTopics) {
     if (completedTopicIds.has(topic.id)) continue;
 
-    // Try days in round-robin order, preferring days with fewer of this subject
+    let remainingDuration = topic.tempoEstimadoMin;
+    let partNumber = 0;
     let placed = false;
+
+    // Try to place the full topic in one day first (diversity-aware)
     for (let attempt = 0; attempt < 7; attempt++) {
       const dayIdx = (dayPointer + attempt) % 7;
       const day = days[dayIdx];
       const remaining = day.availableMin - day.usedMin;
 
       if (remaining >= topic.tempoEstimadoMin) {
-        // Similarity bonus: check if this day already has a topic from the same subject
-        // that has word overlap (related topics together)
         const sameSubjectCount = day.sessions.filter((s) => s.subjectId === subject.id).length;
-
-        // Allow max 2 topics per subject per day to maintain diversity
         if (sameSubjectCount >= 2) continue;
 
         day.sessions.push({
@@ -220,13 +221,13 @@ export async function generateSchedule(
         day.usedMin += topic.tempoEstimadoMin;
         day.subjectIds.add(subject.id);
         reviewQueue.push({ topic, subject, studyDayIndex: dayIdx });
-        dayPointer = (dayIdx + 1) % 7; // next topic starts from the next day
+        dayPointer = (dayIdx + 1) % 7;
         placed = true;
         break;
       }
     }
 
-    // Fallback: if couldn't place with diversity limit, try any day with space
+    // Fallback: try any day with full space (no diversity limit)
     if (!placed) {
       for (let dayIdx = 0; dayIdx < 7; dayIdx++) {
         const day = days[dayIdx];
@@ -245,8 +246,47 @@ export async function generateSchedule(
           day.usedMin += topic.tempoEstimadoMin;
           day.subjectIds.add(subject.id);
           reviewQueue.push({ topic, subject, studyDayIndex: dayIdx });
+          placed = true;
           break;
         }
+      }
+    }
+
+    // Split: topic doesn't fit in any single day — split across multiple days
+    if (!placed) {
+      const splitDays: number[] = [];
+
+      for (let attempt = 0; attempt < 7 && remainingDuration > 0; attempt++) {
+        const dayIdx = (dayPointer + attempt) % 7;
+        const day = days[dayIdx];
+        const dayRemaining = day.availableMin - day.usedMin;
+
+        if (dayRemaining >= MIN_SESSION_DURATION) {
+          const sessionDuration = Math.min(dayRemaining, remainingDuration);
+          partNumber++;
+
+          day.sessions.push({
+            planningId,
+            data: day.date,
+            diaSemana: dayIdx,
+            subjectId: subject.id,
+            topicId: topic.id,
+            tipoSessao: "estudo",
+            duracaoMin: sessionDuration,
+            ordemNoDia: day.sessions.length + 1,
+            status: "pendente",
+          });
+
+          day.usedMin += sessionDuration;
+          day.subjectIds.add(subject.id);
+          remainingDuration -= sessionDuration;
+          splitDays.push(dayIdx);
+        }
+      }
+
+      if (splitDays.length > 0) {
+        reviewQueue.push({ topic, subject, studyDayIndex: splitDays[0] });
+        dayPointer = (splitDays[splitDays.length - 1] + 1) % 7;
       }
     }
   }
