@@ -58,7 +58,7 @@ export function ConcursoForm({ planningId, concurso, onSuccess }: ConcursoFormPr
       </div>
 
       <Button type="submit" className="w-full" disabled={isPending}>
-        {isPending ? "Salvando..." : concurso ? "Salvar" : "Cadastrar"}
+        {isPending ? "Salvando\u2026" : concurso ? "Salvar" : "Cadastrar"}
       </Button>
     </form>
   );

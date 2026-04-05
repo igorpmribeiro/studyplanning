@@ -44,14 +44,14 @@ export function AddSession({ planningId, dayIndex, date, subjects, topics }: Add
 
   function handleSubmit() {
     if (!selectedTopicId) {
-      toast.error("Selecione um subtopico");
+      toast.error("Selecione um subtópico");
       return;
     }
 
     startTransition(async () => {
       const result = await addManualSession(planningId, selectedTopicId, dayIndex, date, duration);
       if (result.success) {
-        toast.success("Sessao adicionada!");
+        toast.success("Sessão adicionada!");
         setOpen(false);
         setSelectedTopicId("");
         setDuration(60);
@@ -73,34 +73,34 @@ export function AddSession({ planningId, dayIndex, date, subjects, topics }: Add
       <DialogTrigger render={
         <Button variant="ghost" size="sm" className="w-full h-7 text-xs text-muted-foreground" />
       }>
-        <Plus className="mr-1 h-3 w-3" />
+        <Plus className="mr-1 h-3 w-3" aria-hidden="true" />
         Adicionar
       </DialogTrigger>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Adicionar Sessao</DialogTitle>
+          <DialogTitle>Adicionar Sessão</DialogTitle>
           <DialogDescription>
-            Adicione manualmente uma sessao de estudo para este dia.
+            Adicione manualmente uma sessão de estudo para este dia.
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="topic-select">Subtopico</Label>
+            <Label htmlFor="topic-select">Subtópico</Label>
             <select
               id="topic-select"
               value={selectedTopicId}
               onChange={(e) => handleTopicChange(e.target.value)}
-              className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+              className="flex h-9 w-full rounded-md border border-input bg-background text-foreground px-3 py-1 text-sm shadow-xs transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
             >
-              <option value="">Selecione...</option>
+              <option value="">Selecione\u2026</option>
               {Array.from(topicsBySubject.entries()).map(([subjectId, subjectTopics]) => {
                 const subject = subjectMap.get(subjectId);
                 return (
-                  <optgroup key={subjectId} label={subject?.nome ?? "—"}>
+                  <optgroup key={subjectId} label={subject?.nome ?? "\u2014"}>
                     {subjectTopics.map((t) => (
                       <option key={t.id} value={t.id}>
-                        {t.nome} ({t.tempoEstimadoMin} min)
+                        {t.nome} ({t.tempoEstimadoMin}&nbsp;min)
                       </option>
                     ))}
                   </optgroup>
@@ -110,10 +110,11 @@ export function AddSession({ planningId, dayIndex, date, subjects, topics }: Add
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="duration">Duracao (minutos)</Label>
+            <Label htmlFor="duration">Duração (minutos)</Label>
             <Input
               id="duration"
               type="number"
+              inputMode="numeric"
               min={5}
               max={480}
               value={duration}
@@ -122,7 +123,7 @@ export function AddSession({ planningId, dayIndex, date, subjects, topics }: Add
           </div>
 
           <Button onClick={handleSubmit} disabled={isPending} className="w-full">
-            {isPending ? "Adicionando..." : "Adicionar Sessao"}
+            {isPending ? "Adicionando\u2026" : "Adicionar Sessão"}
           </Button>
         </div>
       </DialogContent>

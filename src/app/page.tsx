@@ -2,7 +2,7 @@ import { BookOpen, FileText, CalendarDays, CheckCircle2, Clock, RotateCcw } from
 import { getOrCreatePlanning } from "@/actions/planning";
 import { db } from "@/db";
 import { subjects, topics, plannedSessions } from "@/db/schema";
-import { eq, count, inArray } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 
 export default async function HomePage() {
   const planning = await getOrCreatePlanning();
@@ -32,7 +32,6 @@ export default async function HomePage() {
     const completed = subject.topics.filter((t) => t.status === "concluido").length;
     const inProgress = subject.topics.filter((t) => t.status === "em_andamento" || t.status === "revisando").length;
 
-    // Calculate hours from completed sessions for this subject
     const subjectSessions = allSessions.filter((s) => s.subjectId === subject.id && s.status === "concluida");
     const studyMin = subjectSessions
       .filter((s) => s.tipoSessao === "estudo")
@@ -57,28 +56,28 @@ export default async function HomePage() {
 
   const stats = [
     {
-      label: "Total de Materias",
+      label: "Total de Matérias",
       value: subjectCount,
       icon: BookOpen,
       color: "text-blue-600 dark:text-blue-400",
       bg: "bg-blue-50 dark:bg-blue-950",
     },
     {
-      label: "Total de Subtopicos",
+      label: "Total de Subtópicos",
       value: topicCount,
       icon: FileText,
       color: "text-amber-600 dark:text-amber-400",
       bg: "bg-amber-50 dark:bg-amber-950",
     },
     {
-      label: "Sessoes Planejadas",
+      label: "Sessões Planejadas",
       value: totalSessions,
       icon: CalendarDays,
       color: "text-purple-600 dark:text-purple-400",
       bg: "bg-purple-50 dark:bg-purple-950",
     },
     {
-      label: "Sessoes Concluidas",
+      label: "Sessões Concluídas",
       value: completedSessions,
       icon: CheckCircle2,
       color: "text-green-600 dark:text-green-400",
@@ -87,10 +86,10 @@ export default async function HomePage() {
   ];
 
   function formatHours(min: number): string {
-    if (min === 0) return "0min";
+    if (min === 0) return "0\u00A0min";
     const h = Math.floor(min / 60);
     const m = min % 60;
-    if (h === 0) return `${m}min`;
+    if (h === 0) return `${m}\u00A0min`;
     if (m === 0) return `${h}h`;
     return `${h}h${m}min`;
   }
@@ -100,7 +99,7 @@ export default async function HomePage() {
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>
         <p className="text-muted-foreground">
-          Visao geral do seu planejamento de estudos.
+          Visão geral do seu planejamento de estudos.
         </p>
       </div>
 
@@ -114,10 +113,10 @@ export default async function HomePage() {
             <div className="flex items-center justify-between">
               <p className="text-sm text-muted-foreground">{stat.label}</p>
               <div className={`rounded-lg p-2 ${stat.bg}`}>
-                <stat.icon className={`h-4 w-4 ${stat.color}`} />
+                <stat.icon className={`h-4 w-4 ${stat.color}`} aria-hidden="true" />
               </div>
             </div>
-            <p className="mt-2 text-3xl font-bold">{stat.value}</p>
+            <p className="mt-2 text-3xl font-bold tabular-nums">{stat.value}</p>
           </div>
         ))}
       </div>
@@ -127,13 +126,13 @@ export default async function HomePage() {
         <div className="rounded-xl border bg-card p-5 shadow-sm">
           <div className="flex items-center justify-between mb-3">
             <h2 className="font-semibold">Progresso da Semana</h2>
-            <span className="text-sm text-muted-foreground">
-              {completedSessions} de {totalSessions} sessoes ({progressPercent}%)
+            <span className="text-sm text-muted-foreground tabular-nums">
+              {completedSessions} de {totalSessions} sessões ({progressPercent}%)
             </span>
           </div>
           <div className="h-3 w-full rounded-full bg-secondary">
             <div
-              className="h-3 rounded-full bg-primary transition-all duration-500"
+              className="h-3 rounded-full bg-primary transition-[width] duration-500"
               style={{ width: `${progressPercent}%` }}
             />
           </div>
@@ -143,30 +142,30 @@ export default async function HomePage() {
       {/* Per-subject progress */}
       {subjectProgress.length > 0 && (
         <div className="space-y-3">
-          <h2 className="text-lg font-semibold">Progresso por Materia</h2>
+          <h2 className="text-lg font-semibold">Progresso por Matéria</h2>
           <div className="grid gap-3">
             {subjectProgress.map((sp) => (
               <div key={sp.id} className="rounded-xl border bg-card p-4 shadow-sm">
                 <div className="flex items-center justify-between mb-2">
                   <h3 className="text-sm font-medium truncate">{sp.nome}</h3>
-                  <span className="text-xs text-muted-foreground shrink-0 ml-2">
-                    {sp.completed}/{sp.total} concluidos ({sp.pct}%)
+                  <span className="text-xs text-muted-foreground shrink-0 ml-2 tabular-nums">
+                    {sp.completed}/{sp.total} concluídos ({sp.pct}%)
                   </span>
                 </div>
                 <div className="h-2 w-full rounded-full bg-secondary mb-3">
                   <div
-                    className="h-2 rounded-full bg-green-500 transition-all duration-500"
+                    className="h-2 rounded-full bg-green-500 transition-[width] duration-500"
                     style={{ width: `${sp.pct}%` }}
                   />
                 </div>
                 <div className="flex flex-wrap gap-3 text-xs text-muted-foreground">
                   <div className="flex items-center gap-1">
-                    <Clock className="h-3 w-3" />
+                    <Clock className="h-3 w-3" aria-hidden="true" />
                     <span>Estudo: {formatHours(sp.studyMin)}</span>
                   </div>
                   <div className="flex items-center gap-1">
-                    <RotateCcw className="h-3 w-3" />
-                    <span>Revisao: {formatHours(sp.reviewMin)}</span>
+                    <RotateCcw className="h-3 w-3" aria-hidden="true" />
+                    <span>Revisão: {formatHours(sp.reviewMin)}</span>
                   </div>
                   {sp.inProgress > 0 && (
                     <span>{sp.inProgress} em andamento</span>

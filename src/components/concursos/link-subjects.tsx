@@ -43,14 +43,14 @@ export function LinkSubjects({ concursoId, allSubjects, linkedSubjectIds, onDone
       }
 
       await Promise.all(promises);
-      toast.success("Materias atualizadas!");
+      toast.success("Matérias atualizadas!");
       onDone();
     });
   }
 
   return (
     <div className="space-y-4">
-      <div className="max-h-64 overflow-y-auto space-y-1">
+      <div className="max-h-64 overflow-y-auto overscroll-contain space-y-1">
         {allSubjects.map((subject) => (
           <button
             key={subject.id}
@@ -65,7 +65,7 @@ export function LinkSubjects({ concursoId, allSubjects, linkedSubjectIds, onDone
           >
             <span className="truncate">{subject.nome}</span>
             <span className="text-xs text-muted-foreground">
-              {subject.topics.length} subtopicos
+              {subject.topics.length} subtópicos
             </span>
           </button>
         ))}

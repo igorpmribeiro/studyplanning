@@ -20,10 +20,10 @@ export function Sidebar() {
       {/* Logo */}
       <div className="flex items-center gap-3 border-b px-6 py-5">
         <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-          <GraduationCap className="h-5 w-5" />
+          <GraduationCap className="h-5 w-5" aria-hidden="true" />
         </div>
         <div>
-          <h1 className="text-sm font-semibold leading-tight">Gestor de Estudos</h1>
+          <p className="text-sm font-semibold leading-tight">Gestor de Estudos</p>
           <p className="text-xs text-muted-foreground">Premium</p>
         </div>
       </div>
@@ -39,13 +39,13 @@ export function Sidebar() {
               key={item.href}
               href={item.href}
               className={cn(
-                "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
+                "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
                 isActive
                   ? "bg-sidebar-accent text-sidebar-accent-foreground"
                   : "text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground"
               )}
             >
-              <item.icon className="h-4 w-4" />
+              <item.icon className="h-4 w-4" aria-hidden="true" />
               {item.label}
             </Link>
           );

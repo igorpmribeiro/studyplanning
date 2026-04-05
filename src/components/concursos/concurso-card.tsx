@@ -8,15 +8,20 @@ import { deleteConcurso } from "@/actions/concursos";
 import { toast } from "sonner";
 import type { ConcursoWithSubjects } from "@/types";
 
+const dateFmt = new Intl.DateTimeFormat("pt-BR", {
+  day: "2-digit",
+  month: "2-digit",
+  year: "numeric",
+});
+
 interface ConcursoCardProps {
   concurso: ConcursoWithSubjects;
   onEdit: (concurso: ConcursoWithSubjects) => void;
 }
 
 function formatDate(dateStr: string | null): string {
-  if (!dateStr) return "Data nao definida";
-  const [year, month, day] = dateStr.split("-");
-  return `${day}/${month}/${year}`;
+  if (!dateStr) return "Data não definida";
+  return dateFmt.format(new Date(dateStr + "T00:00:00"));
 }
 
 function daysUntil(dateStr: string | null): number | null {
@@ -38,10 +43,10 @@ export function ConcursoCard({ concurso, onEdit }: ConcursoCardProps) {
   const progressPercent = totalTopics > 0 ? Math.round((completedTopics / totalTopics) * 100) : 0;
 
   function handleDelete() {
-    if (!confirm(`Deseja excluir o concurso "${concurso.nome}"? As materias nao serao excluidas.`)) return;
+    if (!confirm(`Deseja excluir o concurso "${concurso.nome}"? As matérias não serão excluídas.`)) return;
     startTransition(async () => {
       const result = await deleteConcurso(concurso.id);
-      if (result.success) toast.success("Concurso excluido!");
+      if (result.success) toast.success("Concurso excluído!");
       else toast.error(result.error);
     });
   }
@@ -53,7 +58,7 @@ export function ConcursoCard({ concurso, onEdit }: ConcursoCardProps) {
           <h3 className="text-lg font-semibold truncate">{concurso.nome}</h3>
           <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
             <div className="flex items-center gap-1">
-              <CalendarDays className="h-3.5 w-3.5" />
+              <CalendarDays className="h-3.5 w-3.5" aria-hidden="true" />
               <span>{formatDate(concurso.dataProva)}</span>
             </div>
             {days !== null && (
@@ -71,15 +76,15 @@ export function ConcursoCard({ concurso, onEdit }: ConcursoCardProps) {
               </Badge>
             )}
             <div className="flex items-center gap-1">
-              <BookOpen className="h-3.5 w-3.5" />
-              <span>{concurso.subjects.length} {concurso.subjects.length === 1 ? "materia" : "materias"}</span>
+              <BookOpen className="h-3.5 w-3.5" aria-hidden="true" />
+              <span>{concurso.subjects.length} {concurso.subjects.length === 1 ? "matéria" : "matérias"}</span>
             </div>
           </div>
         </div>
 
         <div className="flex items-center gap-1 shrink-0">
-          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => onEdit(concurso)}>
-            <Pencil className="h-4 w-4" />
+          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => onEdit(concurso)} aria-label="Editar concurso">
+            <Pencil className="h-4 w-4" aria-hidden="true" />
           </Button>
           <Button
             variant="ghost"
@@ -87,8 +92,9 @@ export function ConcursoCard({ concurso, onEdit }: ConcursoCardProps) {
             className="h-8 w-8 text-destructive"
             onClick={handleDelete}
             disabled={isPending}
+            aria-label="Excluir concurso"
           >
-            <Trash2 className="h-4 w-4" />
+            <Trash2 className="h-4 w-4" aria-hidden="true" />
           </Button>
         </div>
       </div>
@@ -97,12 +103,12 @@ export function ConcursoCard({ concurso, onEdit }: ConcursoCardProps) {
       {totalTopics > 0 && (
         <div className="mt-4">
           <div className="flex items-center justify-between text-xs text-muted-foreground mb-1.5">
-            <span>Progresso dos subtopicos</span>
-            <span>{completedTopics}/{totalTopics} ({progressPercent}%)</span>
+            <span>Progresso dos subtópicos</span>
+            <span className="tabular-nums">{completedTopics}/{totalTopics} ({progressPercent}%)</span>
           </div>
           <div className="h-2 w-full rounded-full bg-secondary">
             <div
-              className="h-2 rounded-full bg-primary transition-all duration-500"
+              className="h-2 rounded-full bg-primary transition-[width] duration-500"
               style={{ width: `${progressPercent}%` }}
             />
           </div>

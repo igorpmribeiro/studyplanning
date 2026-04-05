@@ -53,6 +53,8 @@ export function AvailabilityForm({ planningId, availability }: AvailabilityFormP
                 id={key}
                 name={key}
                 type="number"
+                inputMode="numeric"
+                autoComplete="off"
                 min={0}
                 max={1440}
                 defaultValue={availability?.[key] ?? 0}
@@ -67,7 +69,7 @@ export function AvailabilityForm({ planningId, availability }: AvailabilityFormP
       </div>
 
       <Button type="submit" disabled={isPending} variant="outline" size="sm">
-        {isPending ? "Salvando..." : "Salvar Disponibilidade"}
+        {isPending ? "Salvando\u2026" : "Salvar Disponibilidade"}
       </Button>
     </form>
   );

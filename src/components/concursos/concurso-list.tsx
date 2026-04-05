@@ -72,7 +72,7 @@ export function ConcursoList({ concursos, allSubjects, planningId }: ConcursoLis
         <div className="flex flex-col items-center justify-center rounded-xl border border-dashed p-12 text-center">
           <p className="text-lg font-medium">Nenhum concurso cadastrado</p>
           <p className="mt-1 text-sm text-muted-foreground">
-            Cadastre seus concursos para organizar as materias por prova.
+            Cadastre seus concursos para organizar as matérias por prova.
           </p>
         </div>
       ) : (
@@ -87,7 +87,7 @@ export function ConcursoList({ concursos, allSubjects, planningId }: ConcursoLis
                   className="text-xs"
                   onClick={() => setLinkingConcurso(concurso)}
                 >
-                  Vincular Materias
+                  Vincular Matérias
                 </Button>
               </div>
             </div>
@@ -102,7 +102,7 @@ export function ConcursoList({ concursos, allSubjects, planningId }: ConcursoLis
       >
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Vincular Materias</DialogTitle>
+            <DialogTitle>Vincular Matérias</DialogTitle>
             <DialogDescription>
               Selecione as materias que pertencem ao concurso &ldquo;{linkingConcurso?.nome}&rdquo;.
             </DialogDescription>

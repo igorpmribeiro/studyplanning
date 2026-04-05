@@ -44,14 +44,14 @@ export function SessionCard({ session, subject, topic, allSubjects, allTopics }:
 
       if (result.success) {
         const messages: Record<string, string> = {
-          estudo: "Estudo concluido! Revisao 1 agendada para daqui 10 dias.",
-          revisao_1: "Revisao 1 concluida! Revisao 2 agendada para daqui 35 dias.",
-          revisao_2: "Revisao 2 concluida! Subtopico marcado como concluido.",
+          estudo: "Estudo concluído! Revisão 1 agendada para daqui 10 dias.",
+          revisao_1: "Revisão 1 concluída! Revisão 2 agendada para daqui 35 dias.",
+          revisao_2: "Revisão 2 concluída! Subtópico marcado como concluído.",
         };
         toast.success(
           isCompleted
-            ? "Sessao reaberta — topico voltou a Em Andamento"
-            : messages[session.tipoSessao] ?? "Sessao concluida!"
+            ? "Sessão reaberta \u2014 tópico voltou a Em Andamento"
+            : messages[session.tipoSessao] ?? "Sessão concluída!"
         );
       } else {
         toast.error(result.error);
@@ -63,7 +63,7 @@ export function SessionCard({ session, subject, topic, allSubjects, allTopics }:
     startTransition(async () => {
       const result = await deleteSession(session.id);
       if (result.success) {
-        toast.success("Sessao removida do cronograma");
+        toast.success("Sessão removida do cronograma");
       } else {
         toast.error(result.error);
       }
@@ -73,7 +73,7 @@ export function SessionCard({ session, subject, topic, allSubjects, allTopics }:
   return (
     <div
       className={cn(
-        "group rounded-lg border border-l-4 p-3 transition-all",
+        "group rounded-lg border border-l-4 p-3 transition-colors",
         tipoBorderColors[session.tipoSessao],
         isCompleted && "opacity-60"
       )}
@@ -99,7 +99,7 @@ export function SessionCard({ session, subject, topic, allSubjects, allTopics }:
             <Badge variant="secondary" className={cn("text-xs", tipoColors[session.tipoSessao])}>
               {TIPO_SESSAO_LABELS[session.tipoSessao]}
             </Badge>
-            <span className="text-xs text-muted-foreground">{session.duracaoMin} min</span>
+            <span className="text-xs text-muted-foreground">{session.duracaoMin}&nbsp;min</span>
             {topic && session.duracaoMin < topic.tempoEstimadoMin && (
               <Badge variant="secondary" className="text-xs bg-amber-100 text-amber-800 border-amber-200 dark:bg-amber-900 dark:text-amber-300 dark:border-amber-800">
                 Parcial
@@ -123,22 +123,23 @@ export function SessionCard({ session, subject, topic, allSubjects, allTopics }:
             className="h-7 w-7 shrink-0"
             onClick={handleToggle}
             disabled={isPending}
+            aria-label={isCompleted ? "Reabrir sessão" : "Concluir sessão"}
           >
             {isCompleted ? (
-              <Undo2 className="h-3.5 w-3.5" />
+              <Undo2 className="h-3.5 w-3.5" aria-hidden="true" />
             ) : (
-              <Check className="h-3.5 w-3.5" />
+              <Check className="h-3.5 w-3.5" aria-hidden="true" />
             )}
           </Button>
           <Button
             variant="ghost"
             size="icon"
-            className="h-7 w-7 shrink-0 text-destructive opacity-0 group-hover:opacity-100 transition-opacity"
+            className="h-7 w-7 shrink-0 text-destructive opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-opacity"
             onClick={handleDelete}
             disabled={isPending}
-            title="Remover do cronograma"
+            aria-label="Remover sessão do cronograma"
           >
-            <Trash2 className="h-3.5 w-3.5" />
+            <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
           </Button>
         </div>
       </div>

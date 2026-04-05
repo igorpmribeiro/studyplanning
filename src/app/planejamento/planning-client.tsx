@@ -66,11 +66,11 @@ export function PlanningClient({
   }
 
   function handleDeleteSubject(id: string, nome: string) {
-    if (!confirm(`Excluir a materia "${nome}" e todos os seus subtopicos?`)) return;
+    if (!confirm(`Excluir a matéria "${nome}" e todos os seus subtópicos?`)) return;
     startTransition(async () => {
       const result = await deleteSubject(id);
       if (result.success) {
-        toast.success("Materia excluida!");
+        toast.success("Matéria excluída!");
         setSelectedIds((prev) => prev.filter((i) => i !== id));
       } else {
         toast.error(result.error);
@@ -83,7 +83,7 @@ export function PlanningClient({
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Planejamento</h1>
         <p className="text-muted-foreground">
-          Configure sua disponibilidade, selecione as materias e gere seu cronograma semanal.
+          Configure sua disponibilidade, selecione as matérias e gere seu cronograma semanal.
         </p>
       </div>
 
@@ -99,9 +99,9 @@ export function PlanningClient({
       <section className="space-y-3">
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-lg font-semibold">Materias da Semana</h2>
+            <h2 className="text-lg font-semibold">Matérias da Semana</h2>
             <p className="text-sm text-muted-foreground">
-              Selecione quais materias deseja focar nesta semana.
+              Selecione quais matérias deseja focar nesta semana.
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -112,9 +112,9 @@ export function PlanningClient({
               </DialogTrigger>
               <DialogContent>
                 <DialogHeader>
-                  <DialogTitle>Nova Materia</DialogTitle>
+                  <DialogTitle>Nova Matéria</DialogTitle>
                   <DialogDescription>
-                    Cadastre uma nova materia no seu planejamento.
+                    Cadastre uma nova matéria no seu planejamento.
                   </DialogDescription>
                 </DialogHeader>
                 <SubjectForm
@@ -137,7 +137,7 @@ export function PlanningClient({
           {subjects.length > 0 && (
             <div className="mt-4 border-t pt-3">
               <p className="text-xs text-muted-foreground mb-2">
-                Remover materias do planejamento:
+                Remover matérias do planejamento:
               </p>
               <div className="flex flex-wrap gap-2">
                 {subjects.map((subject) => (
@@ -168,7 +168,7 @@ export function PlanningClient({
         />
         {selectedIds.length === 0 && (
           <p className="text-sm text-destructive">
-            Selecione pelo menos uma materia.
+            Selecione pelo menos uma matéria.
           </p>
         )}
       </section>

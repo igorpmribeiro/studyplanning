@@ -44,7 +44,7 @@ export function SubjectSelector({
         <button
           type="button"
           onClick={allSelected ? onDeselectAll : onSelectAll}
-          className="text-xs text-primary hover:underline"
+          className="text-xs text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded"
         >
           {allSelected ? "Desmarcar todas" : "Selecionar todas"}
         </button>
@@ -63,7 +63,7 @@ export function SubjectSelector({
               type="button"
               onClick={() => onToggle(subject.id)}
               className={cn(
-                "flex items-start gap-3 rounded-lg border p-3 text-left transition-all",
+                "flex items-start gap-3 rounded-lg border p-3 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
                 isSelected
                   ? "border-primary bg-primary/5 ring-1 ring-primary/20"
                   : "border-border hover:border-muted-foreground/30 opacity-60"
@@ -78,7 +78,7 @@ export function SubjectSelector({
                 )}
               >
                 {isSelected && (
-                  <svg className="h-3 w-3" viewBox="0 0 12 12" fill="none">
+                  <svg className="h-3 w-3" viewBox="0 0 12 12" fill="none" aria-hidden="true">
                     <path
                       d="M2 6L5 9L10 3"
                       stroke="currentColor"
@@ -110,14 +110,14 @@ export function SubjectSelector({
 
       {availableSubjects.length === 0 && (
         <p className="py-4 text-center text-sm text-muted-foreground">
-          Nenhuma materia disponivel. Adicione materias ou verifique seus subtopicos.
+          Nenhuma matéria disponível. Adicione matérias ou verifique seus subtópicos.
         </p>
       )}
 
       {completedSubjects.length > 0 && (
         <div className="mt-3 pt-3 border-t">
           <p className="text-xs text-muted-foreground mb-1.5">
-            Materias concluidas ({completedSubjects.length}):
+            Matérias concluídas ({completedSubjects.length}):
           </p>
           <div className="flex flex-wrap gap-1.5">
             {completedSubjects.map((s) => (

@@ -53,7 +53,7 @@ export function DroppableDay({
       <div className="flex items-center justify-between border-b px-4 py-3">
         <h3 className="text-sm font-semibold">{DIA_SEMANA_SHORT[dayIndex]}</h3>
         <div className="flex items-center gap-2 text-xs text-muted-foreground">
-          <span>{totalMin} min</span>
+          <span>{totalMin}&nbsp;min</span>
           {sessions.length > 0 && (
             <span>
               {completedCount}/{sessions.length}
@@ -65,7 +65,7 @@ export function DroppableDay({
         <SortableContext items={sessionIds} strategy={verticalListSortingStrategy}>
           {sessions.length === 0 ? (
             <p className="py-4 text-center text-xs text-muted-foreground">
-              Sem sessoes
+              Sem sessões
             </p>
           ) : (
             sessions.map((session) => (
