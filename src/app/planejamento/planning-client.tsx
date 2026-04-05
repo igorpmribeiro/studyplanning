@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useTransition } from "react";
-import { Plus, Trash2 } from "lucide-react";
+import { useState } from "react";
+import { Plus } from "lucide-react";
 import { AvailabilityForm } from "@/components/availability/availability-form";
 import { SubjectSelector } from "@/components/subjects/subject-selector";
 import { SubjectForm } from "@/components/subjects/subject-form";
@@ -16,8 +16,6 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
-import { deleteSubject } from "@/actions/subjects";
-import { toast } from "sonner";
 import type {
   WeeklyAvailability,
   PlannedSession,
@@ -49,7 +47,6 @@ export function PlanningClient({
     subjects.map((s) => s.id)
   );
   const [addOpen, setAddOpen] = useState(false);
-  const [isPending, startTransition] = useTransition();
 
   function handleToggle(id: string) {
     setSelectedIds((prev) =>
@@ -63,19 +60,6 @@ export function PlanningClient({
 
   function handleDeselectAll() {
     setSelectedIds([]);
-  }
-
-  function handleDeleteSubject(id: string, nome: string) {
-    if (!confirm(`Excluir a matéria "${nome}" e todos os seus subtópicos?`)) return;
-    startTransition(async () => {
-      const result = await deleteSubject(id);
-      if (result.success) {
-        toast.success("Matéria excluída!");
-        setSelectedIds((prev) => prev.filter((i) => i !== id));
-      } else {
-        toast.error(result.error);
-      }
-    });
   }
 
   return (
@@ -133,29 +117,6 @@ export function PlanningClient({
             onSelectAll={handleSelectAll}
             onDeselectAll={handleDeselectAll}
           />
-          {/* Delete buttons for each subject */}
-          {subjects.length > 0 && (
-            <div className="mt-4 border-t pt-3">
-              <p className="text-xs text-muted-foreground mb-2">
-                Remover matérias do planejamento:
-              </p>
-              <div className="flex flex-wrap gap-2">
-                {subjects.map((subject) => (
-                  <Button
-                    key={subject.id}
-                    variant="ghost"
-                    size="sm"
-                    className="h-7 text-xs text-destructive hover:text-destructive hover:bg-destructive/10"
-                    onClick={() => handleDeleteSubject(subject.id, subject.nome)}
-                    disabled={isPending}
-                  >
-                    <Trash2 className="mr-1 h-3 w-3" />
-                    {subject.nome}
-                  </Button>
-                ))}
-              </div>
-            </div>
-          )}
         </div>
       </section>
 
