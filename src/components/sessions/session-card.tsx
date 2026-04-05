@@ -1,10 +1,10 @@
 "use client";
 
 import { useTransition } from "react";
-import { Check, Undo2 } from "lucide-react";
+import { Check, Undo2, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { completeSession, uncompleteSession } from "@/actions/scheduler";
+import { completeSession, uncompleteSession, deleteSession } from "@/actions/scheduler";
 import { EditSessionTopic } from "./edit-session-topic";
 import { SessionTimer } from "./session-timer";
 import { toast } from "sonner";
@@ -44,15 +44,26 @@ export function SessionCard({ session, subject, topic, allSubjects, allTopics }:
 
       if (result.success) {
         const messages: Record<string, string> = {
-          estudo: "Estudo concluído! Revisão 1 agendada para daqui 10 dias.",
-          revisao_1: "Revisão 1 concluída! Revisão 2 agendada para daqui 35 dias.",
-          revisao_2: "Revisão 2 concluída! Subtópico marcado como concluído.",
+          estudo: "Estudo concluido! Revisao 1 agendada para daqui 10 dias.",
+          revisao_1: "Revisao 1 concluida! Revisao 2 agendada para daqui 35 dias.",
+          revisao_2: "Revisao 2 concluida! Subtopico marcado como concluido.",
         };
         toast.success(
           isCompleted
-            ? "Sessão reaberta"
-            : messages[session.tipoSessao] ?? "Sessão concluída!"
+            ? "Sessao reaberta — topico voltou a Em Andamento"
+            : messages[session.tipoSessao] ?? "Sessao concluida!"
         );
+      } else {
+        toast.error(result.error);
+      }
+    });
+  }
+
+  function handleDelete() {
+    startTransition(async () => {
+      const result = await deleteSession(session.id);
+      if (result.success) {
+        toast.success("Sessao removida do cronograma");
       } else {
         toast.error(result.error);
       }
@@ -70,11 +81,11 @@ export function SessionCard({ session, subject, topic, allSubjects, allTopics }:
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0 flex-1">
           <p className={cn("text-sm font-medium truncate", isCompleted && "line-through")}>
-            {subject?.nome ?? "—"}
+            {subject?.nome ?? "\u2014"}
           </p>
           <div className="flex items-center gap-1">
             <p className={cn("text-xs text-muted-foreground truncate", isCompleted && "line-through")}>
-              {topic?.nome ?? "—"}
+              {topic?.nome ?? "\u2014"}
             </p>
             {!isCompleted && allSubjects && allTopics && (
               <EditSessionTopic
@@ -101,8 +112,8 @@ export function SessionCard({ session, subject, topic, allSubjects, allTopics }:
           {!isCompleted && (
             <SessionTimer
               durationMin={session.duracaoMin}
-              subjectName={subject?.nome ?? "—"}
-              topicName={topic?.nome ?? "—"}
+              subjectName={subject?.nome ?? "\u2014"}
+              topicName={topic?.nome ?? "\u2014"}
               onComplete={handleToggle}
             />
           )}
@@ -118,6 +129,16 @@ export function SessionCard({ session, subject, topic, allSubjects, allTopics }:
             ) : (
               <Check className="h-3.5 w-3.5" />
             )}
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-7 w-7 shrink-0 text-destructive opacity-0 group-hover:opacity-100 transition-opacity"
+            onClick={handleDelete}
+            disabled={isPending}
+            title="Remover do cronograma"
+          >
+            <Trash2 className="h-3.5 w-3.5" />
           </Button>
         </div>
       </div>

@@ -6,12 +6,15 @@ import {
 } from "@dnd-kit/sortable";
 import { useDroppable } from "@dnd-kit/core";
 import { SortableSession } from "./sortable-session";
+import { AddSession } from "./add-session";
 import { DIA_SEMANA_SHORT } from "@/lib/constants";
 import type { PlannedSession, Subject, Topic } from "@/types";
 import { cn } from "@/lib/utils";
 
 interface DroppableDayProps {
   dayIndex: number;
+  date: string;
+  planningId: string;
   sessions: PlannedSession[];
   subjectMap: Map<string, Subject>;
   topicMap: Map<string, Topic>;
@@ -22,6 +25,8 @@ interface DroppableDayProps {
 
 export function DroppableDay({
   dayIndex,
+  date,
+  planningId,
   sessions,
   subjectMap,
   topicMap,
@@ -60,7 +65,7 @@ export function DroppableDay({
         <SortableContext items={sessionIds} strategy={verticalListSortingStrategy}>
           {sessions.length === 0 ? (
             <p className="py-4 text-center text-xs text-muted-foreground">
-              Sem sessões
+              Sem sessoes
             </p>
           ) : (
             sessions.map((session) => (
@@ -75,6 +80,13 @@ export function DroppableDay({
             ))
           )}
         </SortableContext>
+        <AddSession
+          planningId={planningId}
+          dayIndex={dayIndex}
+          date={date}
+          subjects={allSubjects}
+          topics={allTopics}
+        />
       </div>
     </div>
   );

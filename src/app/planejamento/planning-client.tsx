@@ -177,6 +177,7 @@ export function PlanningClient({
       <section className="space-y-3">
         <h2 className="text-lg font-semibold">Cronograma Semanal</h2>
         <WeeklyView
+          planningId={planningId}
           sessions={sessions}
           subjects={allSubjects}
           topics={allTopics}

@@ -10,6 +10,7 @@ async function clean() {
   await sql`DELETE FROM weekly_availabilities`;
   await sql`DELETE FROM topics`;
   await sql`DELETE FROM subjects`;
+  await sql`DELETE FROM concursos`;
   await sql`DELETE FROM plannings`;
   console.log("Banco limpo com sucesso!");
   await sql.end();

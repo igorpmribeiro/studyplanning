@@ -21,13 +21,14 @@ import { toast } from "sonner";
 import type { PlannedSession, Subject, Topic } from "@/types";
 
 interface WeeklyViewProps {
+  planningId: string;
   sessions: PlannedSession[];
   subjects: Subject[];
   topics: Topic[];
   weekDates: string[];
 }
 
-export function WeeklyView({ sessions: initialSessions, subjects, topics, weekDates }: WeeklyViewProps) {
+export function WeeklyView({ planningId, sessions: initialSessions, subjects, topics, weekDates }: WeeklyViewProps) {
   const [sessions, setSessions] = useState(initialSessions);
   const [activeSession, setActiveSession] = useState<PlannedSession | null>(null);
   const [overDayIndex, setOverDayIndex] = useState<number | null>(null);
@@ -236,6 +237,8 @@ export function WeeklyView({ sessions: initialSessions, subjects, topics, weekDa
           <DroppableDay
             key={dayIndex}
             dayIndex={dayIndex}
+            date={weekDates[dayIndex]}
+            planningId={planningId}
             sessions={byDay[dayIndex]}
             subjectMap={subjectMap}
             topicMap={topicMap}

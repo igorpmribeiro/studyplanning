@@ -436,17 +436,130 @@ export async function completeSession(
 export async function uncompleteSession(
   sessionId: string
 ): Promise<ActionResult<PlannedSession>> {
+  const [session] = await db
+    .select()
+    .from(plannedSessions)
+    .where(eq(plannedSessions.id, sessionId));
+
+  if (!session) return { success: false, error: "Sessao nao encontrada" };
+
+  // Revert the session to pending
   const [updated] = await db
     .update(plannedSessions)
     .set({ status: "pendente", updatedAt: new Date() })
     .where(eq(plannedSessions.id, sessionId))
     .returning();
 
-  if (!updated) return { success: false, error: "Sessão não encontrada" };
+  // Revert topic status and remove future reviews
+  if (session.tipoSessao === "estudo") {
+    // Study was marked complete → topic went to "revisando", rev1 was scheduled
+    // Revert topic to "em_andamento" and delete pending rev1
+    await db
+      .update(topics)
+      .set({ status: "em_andamento", updatedAt: new Date() })
+      .where(eq(topics.id, session.topicId));
+
+    // Delete pending revisao_1 for this topic
+    await db
+      .delete(plannedSessions)
+      .where(
+        and(
+          eq(plannedSessions.topicId, session.topicId),
+          eq(plannedSessions.tipoSessao, "revisao_1"),
+          eq(plannedSessions.status, "pendente")
+        )
+      );
+  } else if (session.tipoSessao === "revisao_1") {
+    // Rev1 was marked complete → rev2 was scheduled
+    // Revert topic to "revisando" and delete pending rev2
+    await db
+      .update(topics)
+      .set({ status: "revisando", updatedAt: new Date() })
+      .where(eq(topics.id, session.topicId));
+
+    await db
+      .delete(plannedSessions)
+      .where(
+        and(
+          eq(plannedSessions.topicId, session.topicId),
+          eq(plannedSessions.tipoSessao, "revisao_2"),
+          eq(plannedSessions.status, "pendente")
+        )
+      );
+  } else if (session.tipoSessao === "revisao_2") {
+    // Rev2 was marked complete → topic went to "concluido"
+    // Revert topic to "revisando"
+    await db
+      .update(topics)
+      .set({ status: "revisando", updatedAt: new Date() })
+      .where(eq(topics.id, session.topicId));
+  }
+
+  revalidatePath("/planejamento");
+  revalidatePath("/materias");
+  revalidatePath("/");
+  return { success: true, data: updated };
+}
+
+// ─── Delete Session ─────────────────────────────────────────
+
+export async function deleteSession(
+  sessionId: string
+): Promise<ActionResult> {
+  const deleted = await db
+    .delete(plannedSessions)
+    .where(eq(plannedSessions.id, sessionId))
+    .returning();
+
+  if (deleted.length === 0) return { success: false, error: "Sessao nao encontrada" };
 
   revalidatePath("/planejamento");
   revalidatePath("/");
-  return { success: true, data: updated };
+  return { success: true, data: undefined };
+}
+
+// ─── Add Manual Session ─────────────────────────────────────
+
+export async function addManualSession(
+  planningId: string,
+  topicId: string,
+  diaSemana: number,
+  date: string,
+  duracaoMin: number
+): Promise<ActionResult<PlannedSession>> {
+  const [topic] = await db.select().from(topics).where(eq(topics.id, topicId));
+  if (!topic) return { success: false, error: "Subtopico nao encontrado" };
+
+  // Get current max order for this day
+  const daySessions = await db
+    .select()
+    .from(plannedSessions)
+    .where(
+      and(
+        eq(plannedSessions.planningId, planningId),
+        eq(plannedSessions.data, date)
+      )
+    );
+
+  const maxOrder = daySessions.reduce((max, s) => Math.max(max, s.ordemNoDia), 0);
+
+  const [inserted] = await db
+    .insert(plannedSessions)
+    .values({
+      planningId,
+      data: date,
+      diaSemana,
+      subjectId: topic.subjectId,
+      topicId,
+      tipoSessao: "estudo",
+      duracaoMin,
+      ordemNoDia: maxOrder + 1,
+      status: "pendente",
+    })
+    .returning();
+
+  revalidatePath("/planejamento");
+  return { success: true, data: inserted };
 }
 
 // ─── Get Sessions ───────────────────────────────────────────
@@ -457,6 +570,21 @@ export async function getSessions(planningId: string): Promise<PlannedSession[]>
     .from(plannedSessions)
     .where(eq(plannedSessions.planningId, planningId))
     .orderBy(asc(plannedSessions.data), asc(plannedSessions.ordemNoDia));
+}
+
+// ─── Get Sessions For Week ──────────────────────────────────
+
+export async function getSessionsForWeek(
+  planningId: string,
+  weekDates: string[]
+): Promise<PlannedSession[]> {
+  const all = await db
+    .select()
+    .from(plannedSessions)
+    .where(eq(plannedSessions.planningId, planningId))
+    .orderBy(asc(plannedSessions.data), asc(plannedSessions.ordemNoDia));
+
+  return all.filter((s) => weekDates.includes(s.data));
 }
 
 // ─── Move Session (drag and drop) ───────────────────────────
