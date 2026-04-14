@@ -56,6 +56,9 @@ export function SessionTimer({
   );
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const quoteIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  // Wall-clock timestamp when timer was started/resumed, and snapshot of secondsLeft at that moment
+  const startTimestampRef = useRef<number | null>(null);
+  const startSecondsRef = useRef<number>(durationMin * 60);
 
   const totalSeconds = durationMin * 60;
   const progress = totalSeconds > 0 ? ((totalSeconds - secondsLeft) / totalSeconds) * 100 : 0;
@@ -74,16 +77,22 @@ export function SessionTimer({
 
   useEffect(() => {
     if (isRunning && !isFinished) {
-      intervalRef.current = setInterval(() => {
-        setSecondsLeft((prev) => {
-          if (prev <= 1) {
-            setIsRunning(false);
-            return 0;
-          }
-          return prev - 1;
-        });
-      }, 1000);
+      startTimestampRef.current = Date.now();
+      startSecondsRef.current = secondsLeft;
+
+      const tick = () => {
+        const elapsed = Math.floor((Date.now() - startTimestampRef.current!) / 1000);
+        const remaining = Math.max(0, startSecondsRef.current - elapsed);
+        setSecondsLeft(remaining);
+        if (remaining <= 0) {
+          setIsRunning(false);
+        }
+      };
+
+      // Use a short interval so the display catches up quickly when the tab regains focus
+      intervalRef.current = setInterval(tick, 500);
     } else {
+      startTimestampRef.current = null;
       if (intervalRef.current) {
         clearInterval(intervalRef.current);
         intervalRef.current = null;
@@ -92,6 +101,7 @@ export function SessionTimer({
     return () => {
       if (intervalRef.current) clearInterval(intervalRef.current);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isRunning, isFinished]);
 
   useEffect(() => {
