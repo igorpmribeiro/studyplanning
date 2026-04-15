@@ -518,6 +518,24 @@ export async function deleteSession(
   return { success: true, data: undefined };
 }
 
+// ─── Save Session Notes ────────────────────────────────────
+
+export async function saveSessionNotes(
+  sessionId: string,
+  notas: string
+): Promise<ActionResult> {
+  const [updated] = await db
+    .update(plannedSessions)
+    .set({ notas: notas || null, updatedAt: new Date() })
+    .where(eq(plannedSessions.id, sessionId))
+    .returning();
+
+  if (!updated) return { success: false, error: "Sessão não encontrada" };
+
+  revalidatePath("/planejamento");
+  return { success: true, data: undefined };
+}
+
 // ─── Add Manual Session ─────────────────────────────────────
 
 export async function addManualSession(

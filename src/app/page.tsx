@@ -1,7 +1,10 @@
 export const dynamic = "force-dynamic";
 
-import { BookOpen, FileText, CalendarDays, CheckCircle2, Clock, RotateCcw } from "lucide-react";
+import Link from "next/link";
+import { BookOpen, FileText, CalendarDays, CheckCircle2, Clock, RotateCcw, ClipboardList, Target, Flame } from "lucide-react";
 import { getOrCreatePlanning } from "@/actions/planning";
+import { getQuizStats } from "@/actions/simulado";
+import { getStudyDays, getWeakAreas } from "@/actions/desempenho";
 import { db } from "@/db";
 import { subjects, topics, plannedSessions } from "@/db/schema";
 import { eq, inArray } from "drizzle-orm";
@@ -9,7 +12,7 @@ import { eq, inArray } from "drizzle-orm";
 export default async function HomePage() {
   const planning = await getOrCreatePlanning();
 
-  const [subjectRows, allSessions] = await Promise.all([
+  const [subjectRows, allSessions, quizStats, studyDays, weakAreas] = await Promise.all([
     db.query.subjects.findMany({
       where: eq(subjects.planningId, planning.id),
       with: { topics: true },
@@ -18,7 +21,81 @@ export default async function HomePage() {
       .select()
       .from(plannedSessions)
       .where(eq(plannedSessions.planningId, planning.id)),
+    getQuizStats(planning.id),
+    getStudyDays(planning.id),
+    getWeakAreas(planning.id),
   ]);
+
+  // Calculate streak
+  function calcStreak(days: string[]): number {
+    if (days.length === 0) return 0;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const todayStr = today.toISOString().slice(0, 10);
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+    const yesterdayStr = yesterday.toISOString().slice(0, 10);
+
+    // days is sorted DESC - check if streak is current
+    if (days[0] !== todayStr && days[0] !== yesterdayStr) return 0;
+
+    let streak = 1;
+    for (let i = 1; i < days.length; i++) {
+      const prev = new Date(days[i - 1]);
+      const curr = new Date(days[i]);
+      const diff = (prev.getTime() - curr.getTime()) / (1000 * 60 * 60 * 24);
+      if (diff === 1) {
+        streak++;
+      } else {
+        break;
+      }
+    }
+    return streak;
+  }
+
+  const streak = calcStreak(studyDays);
+
+  // Build recommendations
+  type Recommendation = { label: string; reason: string; type: "weak" | "pending" | "new" };
+  const recommendations: Recommendation[] = [];
+
+  // 1. Weak areas from quizzes
+  for (const area of weakAreas.slice(0, 2)) {
+    recommendations.push({
+      label: `${area.topicNome}`,
+      reason: `Acertou ${area.pct}% nos simulados (${area.subjectNome})`,
+      type: "weak",
+    });
+  }
+
+  // 2. Topics in "revisando" status (need review)
+  const reviewingTopics = subjectRows
+    .flatMap((s) => s.topics.filter((t) => t.status === "revisando").map((t) => ({ ...t, subjectNome: s.nome })))
+    .slice(0, 2);
+  for (const t of reviewingTopics) {
+    if (!recommendations.some((r) => r.label === t.nome)) {
+      recommendations.push({
+        label: t.nome,
+        reason: `Em revisão (${t.subjectNome})`,
+        type: "pending",
+      });
+    }
+  }
+
+  // 3. High-priority not started topics
+  const notStarted = subjectRows
+    .filter((s) => s.prioridade === "alta")
+    .flatMap((s) => s.topics.filter((t) => t.status === "nao_iniciado").map((t) => ({ ...t, subjectNome: s.nome })))
+    .slice(0, 2);
+  for (const t of notStarted) {
+    if (!recommendations.some((r) => r.label === t.nome)) {
+      recommendations.push({
+        label: t.nome,
+        reason: `Não iniciado, matéria prioritária (${t.subjectNome})`,
+        type: "new",
+      });
+    }
+  }
 
   const subjectCount = subjectRows.length;
 
@@ -85,6 +162,20 @@ export default async function HomePage() {
       color: "text-green-600 dark:text-green-400",
       bg: "bg-green-50 dark:bg-green-950",
     },
+    {
+      label: "Simulados",
+      value: quizStats.totalQuizzes,
+      icon: ClipboardList,
+      color: "text-indigo-600 dark:text-indigo-400",
+      bg: "bg-indigo-50 dark:bg-indigo-950",
+    },
+    {
+      label: "Acerto Médio",
+      value: `${quizStats.averageScore}%`,
+      icon: Target,
+      color: "text-rose-600 dark:text-rose-400",
+      bg: "bg-rose-50 dark:bg-rose-950",
+    },
   ];
 
   function formatHours(min: number): string {
@@ -106,7 +197,7 @@ export default async function HomePage() {
       </div>
 
       {/* Stats Grid */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
         {stats.map((stat) => (
           <div
             key={stat.label}
@@ -137,6 +228,51 @@ export default async function HomePage() {
               className="h-3 rounded-full bg-primary transition-[width] duration-500"
               style={{ width: `${progressPercent}%` }}
             />
+          </div>
+        </div>
+      )}
+
+      {/* Streak */}
+      {streak > 0 && (
+        <div className="rounded-xl border bg-card p-5 shadow-sm">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-orange-100 dark:bg-orange-950">
+              <Flame className="h-5 w-5 text-orange-500" aria-hidden="true" />
+            </div>
+            <div>
+              <p className="text-2xl font-bold tabular-nums">
+                {streak} dia{streak !== 1 ? "s" : ""} de sequência
+              </p>
+              <p className="text-sm text-muted-foreground">
+                Continue estudando para manter sua sequência!
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Recommendations */}
+      {recommendations.length > 0 && (
+        <div className="space-y-3">
+          <h2 className="text-lg font-semibold">O que estudar agora?</h2>
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {recommendations.slice(0, 3).map((rec) => {
+              const colors = {
+                weak: "border-l-red-500 bg-red-50/50 dark:bg-red-950/20",
+                pending: "border-l-amber-500 bg-amber-50/50 dark:bg-amber-950/20",
+                new: "border-l-blue-500 bg-blue-50/50 dark:bg-blue-950/20",
+              };
+              const labels = { weak: "Ponto fraco", pending: "Revisão pendente", new: "Novo tópico" };
+              return (
+                <div key={rec.label} className={`rounded-lg border border-l-4 p-4 ${colors[rec.type]}`}>
+                  <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                    {labels[rec.type]}
+                  </span>
+                  <p className="mt-1 text-sm font-medium truncate">{rec.label}</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">{rec.reason}</p>
+                </div>
+              );
+            })}
           </div>
         </div>
       )}

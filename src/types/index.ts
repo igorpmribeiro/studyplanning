@@ -10,6 +10,8 @@ import type {
   generateScheduleSchema,
   createConcursoSchema,
   updateConcursoSchema,
+  startQuizSchema,
+  submitAnswerSchema,
 } from "@/schemas";
 import type {
   plannings,
@@ -18,6 +20,9 @@ import type {
   weeklyAvailabilities,
   plannedSessions,
   concursos,
+  quizQuestions,
+  quizSessions,
+  quizAnswers,
 } from "@/db/schema";
 
 // ─── Drizzle inferred types (row types) ─────────────────────
@@ -55,6 +60,33 @@ export type ConcursoWithSubjects = Concurso & {
 export type SessionWithDetails = PlannedSession & {
   subject: Subject;
   topic: Topic;
+};
+
+// ─── Quiz types ─────────────────────────────────────────────
+
+export type QuizQuestion = typeof quizQuestions.$inferSelect;
+export type QuizSession = typeof quizSessions.$inferSelect;
+export type QuizAnswer = typeof quizAnswers.$inferSelect;
+
+export type StartQuiz = z.infer<typeof startQuizSchema>;
+export type SubmitAnswer = z.infer<typeof submitAnswerSchema>;
+
+export type QuizQuestionWithParsed = QuizQuestion & {
+  parsedAlternativas: string[] | null;
+};
+
+export type QuizSessionWithDetails = QuizSession & {
+  answers: (QuizAnswer & { question: QuizQuestion })[];
+  filters: { subject?: Subject | null; topic?: Topic | null }[];
+};
+
+export type QuizStats = {
+  totalQuizzes: number;
+  totalQuestions: number;
+  totalCorrect: number;
+  averageScore: number;
+  byBanca: Record<string, { total: number; correct: number; avg: number }>;
+  bySubject: Record<string, { nome: string; total: number; correct: number; avg: number }>;
 };
 
 // ─── API response types ─────────────────────────────────────

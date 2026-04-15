@@ -12,6 +12,9 @@ export const topicStatusEnum = pgEnum("topic_status", [
 ]);
 export const tipoSessaoEnum = pgEnum("tipo_sessao", ["estudo", "revisao_1", "revisao_2"]);
 export const sessionStatusEnum = pgEnum("session_status", ["pendente", "concluida"]);
+export const bancaEnum = pgEnum("banca", ["cespe", "fcc", "fgv", "vunesp", "generica"]);
+export const questionFormatEnum = pgEnum("question_format", ["certo_errado", "multipla_escolha"]);
+export const quizModeEnum = pgEnum("quiz_mode", ["por_materia", "por_topico", "misto", "revisao"]);
 
 // ─── Concursos ──────────────────────────────────────────────
 
@@ -49,6 +52,7 @@ export const planningsRelations = relations(plannings, ({ many }) => ({
   subjects: many(subjects),
   weeklyAvailabilities: many(weeklyAvailabilities),
   plannedSessions: many(plannedSessions),
+  quizSessions: many(quizSessions),
 }));
 
 // ─── Subjects (Matérias) ────────────────────────────────────
@@ -77,6 +81,7 @@ export const subjectsRelations = relations(subjects, ({ one, many }) => ({
     references: [concursos.id],
   }),
   topics: many(topics),
+  quizQuestions: many(quizQuestions),
 }));
 
 // ─── Topics (Subtópicos) ────────────────────────────────────
@@ -96,11 +101,12 @@ export const topics = pgTable("topics", {
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 });
 
-export const topicsRelations = relations(topics, ({ one }) => ({
+export const topicsRelations = relations(topics, ({ one, many }) => ({
   subject: one(subjects, {
     fields: [topics.subjectId],
     references: [subjects.id],
   }),
+  quizQuestions: many(quizQuestions),
 }));
 
 // ─── Weekly Availabilities ──────────────────────────────────
@@ -147,6 +153,7 @@ export const plannedSessions = pgTable("planned_sessions", {
   duracaoMin: integer("duracao_min").notNull(),
   ordemNoDia: integer("ordem_no_dia").notNull(),
   status: sessionStatusEnum("status").notNull().default("pendente"),
+  notas: text("notas"),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 });
@@ -162,6 +169,116 @@ export const plannedSessionsRelations = relations(plannedSessions, ({ one }) => 
   }),
   topic: one(topics, {
     fields: [plannedSessions.topicId],
+    references: [topics.id],
+  }),
+}));
+
+// ─── Quiz Questions (cache de questões geradas por IA) ─────
+
+export const quizQuestions = pgTable("quiz_questions", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  topicId: uuid("topic_id")
+    .notNull()
+    .references(() => topics.id, { onDelete: "cascade" }),
+  subjectId: uuid("subject_id")
+    .notNull()
+    .references(() => subjects.id, { onDelete: "cascade" }),
+  banca: bancaEnum("banca").notNull(),
+  formato: questionFormatEnum("formato").notNull(),
+  dificuldade: dificuldadeEnum("dificuldade").notNull(),
+  enunciado: text("enunciado").notNull(),
+  alternativas: text("alternativas"), // JSON string[] para múltipla escolha, null para certo/errado
+  respostaCorreta: text("resposta_correta").notNull(),
+  explicacao: text("explicacao").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+export const quizQuestionsRelations = relations(quizQuestions, ({ one, many }) => ({
+  topic: one(topics, {
+    fields: [quizQuestions.topicId],
+    references: [topics.id],
+  }),
+  subject: one(subjects, {
+    fields: [quizQuestions.subjectId],
+    references: [subjects.id],
+  }),
+  answers: many(quizAnswers),
+}));
+
+// ─── Quiz Sessions (tentativas de simulado) ────────────────
+
+export const quizSessions = pgTable("quiz_sessions", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  planningId: uuid("planning_id")
+    .notNull()
+    .references(() => plannings.id, { onDelete: "cascade" }),
+  banca: bancaEnum("banca").notNull(),
+  modo: quizModeEnum("modo").notNull(),
+  totalQuestoes: integer("total_questoes").notNull(),
+  acertos: integer("acertos").notNull().default(0),
+  erros: integer("erros").notNull().default(0),
+  tempoSegundos: integer("tempo_segundos"),
+  completedAt: timestamp("completed_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+export const quizSessionsRelations = relations(quizSessions, ({ one, many }) => ({
+  planning: one(plannings, {
+    fields: [quizSessions.planningId],
+    references: [plannings.id],
+  }),
+  answers: many(quizAnswers),
+  filters: many(quizSessionFilters),
+}));
+
+// ─── Quiz Answers (respostas individuais) ───────────────────
+
+export const quizAnswers = pgTable("quiz_answers", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  quizSessionId: uuid("quiz_session_id")
+    .notNull()
+    .references(() => quizSessions.id, { onDelete: "cascade" }),
+  questionId: uuid("question_id")
+    .notNull()
+    .references(() => quizQuestions.id, { onDelete: "cascade" }),
+  respostaUsuario: text("resposta_usuario").notNull(),
+  correto: integer("correto").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+export const quizAnswersRelations = relations(quizAnswers, ({ one }) => ({
+  quizSession: one(quizSessions, {
+    fields: [quizAnswers.quizSessionId],
+    references: [quizSessions.id],
+  }),
+  question: one(quizQuestions, {
+    fields: [quizAnswers.questionId],
+    references: [quizQuestions.id],
+  }),
+}));
+
+// ─── Quiz Session Filters (matérias/tópicos filtrados) ──────
+
+export const quizSessionFilters = pgTable("quiz_session_filters", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  quizSessionId: uuid("quiz_session_id")
+    .notNull()
+    .references(() => quizSessions.id, { onDelete: "cascade" }),
+  subjectId: uuid("subject_id").references(() => subjects.id, { onDelete: "set null" }),
+  topicId: uuid("topic_id").references(() => topics.id, { onDelete: "set null" }),
+});
+
+export const quizSessionFiltersRelations = relations(quizSessionFilters, ({ one }) => ({
+  quizSession: one(quizSessions, {
+    fields: [quizSessionFilters.quizSessionId],
+    references: [quizSessions.id],
+  }),
+  subject: one(subjects, {
+    fields: [quizSessionFilters.subjectId],
+    references: [subjects.id],
+  }),
+  topic: one(topics, {
+    fields: [quizSessionFilters.topicId],
     references: [topics.id],
   }),
 }));

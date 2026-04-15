@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, BookOpen, CalendarDays, GraduationCap, Trophy } from "lucide-react";
+import { LayoutDashboard, BookOpen, CalendarDays, GraduationCap, Trophy, ClipboardList, TrendingUp } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const navItems = [
@@ -10,6 +10,8 @@ const navItems = [
   { href: "/concursos", label: "Concursos", icon: Trophy },
   { href: "/materias", label: "Matérias", icon: BookOpen },
   { href: "/planejamento", label: "Planejamento", icon: CalendarDays },
+  { href: "/simulado", label: "Simulado", icon: ClipboardList },
+  { href: "/desempenho", label: "Desempenho", icon: TrendingUp },
 ];
 
 export function Sidebar() {

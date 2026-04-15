@@ -2,7 +2,7 @@ export const dynamic = "force-dynamic";
 
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, ClipboardList } from "lucide-react";
 import { getSubjectById } from "@/actions/subjects";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -58,6 +58,17 @@ export default async function SubjectDetailPage({
               <p className="mt-3 text-sm text-muted-foreground">{subject.observacoes}</p>
             )}
           </div>
+          {subject.topics.length > 0 && (
+            <Button
+              render={<Link href={`/simulado?modo=por_materia&subjectId=${subject.id}`} />}
+              variant="outline"
+              size="sm"
+              className="gap-1.5 shrink-0"
+            >
+              <ClipboardList className="h-4 w-4" aria-hidden="true" />
+              Praticar
+            </Button>
+          )}
         </div>
       </div>
 

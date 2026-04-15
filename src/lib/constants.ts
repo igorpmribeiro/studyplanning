@@ -88,3 +88,43 @@ export const SESSION_STATUS_LABELS = {
   pendente: "Pendente",
   concluida: "Concluída",
 } as const;
+
+// ─── Simulado ──────────────────────────────────────────────
+
+export const Banca = {
+  CESPE: "cespe",
+  FCC: "fcc",
+  FGV: "fgv",
+  VUNESP: "vunesp",
+  GENERICA: "generica",
+} as const;
+
+export const BANCA_LABELS = {
+  cespe: "CESPE/CEBRASPE",
+  fcc: "FCC",
+  fgv: "FGV",
+  vunesp: "VUNESP",
+  generica: "Genérica",
+} as const;
+
+export const BANCA_FORMATS = {
+  cespe: "certo_errado",
+  fcc: "multipla_escolha",
+  fgv: "multipla_escolha",
+  vunesp: "multipla_escolha",
+  generica: "multipla_escolha",
+} as const;
+
+export const QuizMode = {
+  POR_MATERIA: "por_materia",
+  POR_TOPICO: "por_topico",
+  MISTO: "misto",
+  REVISAO: "revisao",
+} as const;
+
+export const QUIZ_MODE_LABELS = {
+  por_materia: "Por Matéria",
+  por_topico: "Por Tópico",
+  misto: "Misto (Simulado)",
+  revisao: "Revisão",
+} as const;

@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { completeSession, uncompleteSession, deleteSession } from "@/actions/scheduler";
 import { EditSessionTopic } from "./edit-session-topic";
 import { SessionTimer } from "./session-timer";
+import { SessionNotes } from "./session-notes";
 import { toast } from "sonner";
 import { TIPO_SESSAO_LABELS } from "@/lib/constants";
 import type { PlannedSession, Subject, Topic } from "@/types";
@@ -131,6 +132,7 @@ export function SessionCard({ session, subject, topic, allSubjects, allTopics }:
               <Check className="h-3.5 w-3.5" aria-hidden="true" />
             )}
           </Button>
+          <SessionNotes sessionId={session.id} initialNotes={session.notas} />
           <Button
             variant="ghost"
             size="icon"
