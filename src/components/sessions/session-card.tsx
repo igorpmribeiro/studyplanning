@@ -46,7 +46,7 @@ export function SessionCard({ session, subject, topic, allSubjects, allTopics }:
       if (result.success) {
         const messages: Record<string, string> = {
           estudo: "Estudo concluído! Revisão 1 agendada para daqui 10 dias.",
-          revisao_1: "Revisão 1 concluída! Revisão 2 agendada para daqui 35 dias.",
+          revisao_1: "Revisão 1 concluída! Revisão 2 agendada para daqui 20 dias.",
           revisao_2: "Revisão 2 concluída! Subtópico marcado como concluído.",
         };
         toast.success(

@@ -97,6 +97,9 @@ export const topics = pgTable("topics", {
   status: topicStatusEnum("status").notNull().default("nao_iniciado"),
   ordem: integer("ordem").notNull().default(0),
   observacoes: text("observacoes").default(""),
+  studyCompletedAt: timestamp("study_completed_at", { withTimezone: true }),
+  revisao1CompletedAt: timestamp("revisao1_completed_at", { withTimezone: true }),
+  revisao2CompletedAt: timestamp("revisao2_completed_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 });

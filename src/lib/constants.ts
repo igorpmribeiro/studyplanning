@@ -60,6 +60,10 @@ export const DIA_SEMANA_SHORT: Record<number, string> = {
   6: "Dom",
 };
 
+// Intervalos de revisão (dias após conclusão do estudo original)
+export const REVISAO_1_DIAS = 10;
+export const REVISAO_2_DIAS = 30;
+
 // Scores para o algoritmo de planejamento
 export const PRIORIDADE_SCORE = { baixa: 1, media: 2, alta: 3 } as const;
 export const DIFICULDADE_SCORE = { baixa: 1, media: 2, alta: 3 } as const;

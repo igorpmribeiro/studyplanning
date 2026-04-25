@@ -2,7 +2,16 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, BookOpen, CalendarDays, GraduationCap, Trophy, ClipboardList, TrendingUp } from "lucide-react";
+import {
+  LayoutDashboard,
+  BookOpen,
+  CalendarDays,
+  GraduationCap,
+  Trophy,
+  ClipboardList,
+  TrendingUp,
+  RotateCcw,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const navItems = [
@@ -10,11 +19,16 @@ const navItems = [
   { href: "/concursos", label: "Concursos", icon: Trophy },
   { href: "/materias", label: "Matérias", icon: BookOpen },
   { href: "/planejamento", label: "Planejamento", icon: CalendarDays },
+  { href: "/revisoes", label: "Revisões", icon: RotateCcw, badgeKey: "revisoes" as const },
   { href: "/simulado", label: "Simulado", icon: ClipboardList },
   { href: "/desempenho", label: "Desempenho", icon: TrendingUp },
 ];
 
-export function Sidebar() {
+interface SidebarProps {
+  badges?: { revisoes?: number };
+}
+
+export function Sidebar({ badges }: SidebarProps = {}) {
   const pathname = usePathname();
 
   return (
@@ -35,6 +49,7 @@ export function Sidebar() {
         {navItems.map((item) => {
           const isActive =
             item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
+          const badgeCount = item.badgeKey ? badges?.[item.badgeKey] ?? 0 : 0;
 
           return (
             <Link
@@ -48,7 +63,15 @@ export function Sidebar() {
               )}
             >
               <item.icon className="h-4 w-4" aria-hidden="true" />
-              {item.label}
+              <span className="flex-1">{item.label}</span>
+              {badgeCount > 0 && (
+                <span
+                  className="ml-auto inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1.5 text-[10px] font-semibold text-white tabular-nums"
+                  aria-label={`${badgeCount} pendente${badgeCount === 1 ? "" : "s"}`}
+                >
+                  {badgeCount > 99 ? "99+" : badgeCount}
+                </span>
+              )}
             </Link>
           );
         })}

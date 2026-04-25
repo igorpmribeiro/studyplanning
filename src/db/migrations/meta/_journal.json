@@ -29,6 +29,13 @@
       "when": 1776271805521,
       "tag": "0003_hot_cobalt_man",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1777146505267,
+      "tag": "0004_little_darkstar",
+      "breakpoints": true
     }
   ]
 }

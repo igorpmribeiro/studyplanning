@@ -9,9 +9,16 @@ const pageTitles: Record<string, string> = {
   "/concursos": "Concursos",
   "/materias": "Matérias",
   "/planejamento": "Planejamento",
+  "/revisoes": "Revisões",
+  "/simulado": "Simulado",
+  "/desempenho": "Desempenho",
 };
 
-export function Header() {
+interface HeaderProps {
+  badges?: { revisoes?: number };
+}
+
+export function Header({ badges }: HeaderProps) {
   const pathname = usePathname();
 
   const title =
@@ -21,7 +28,7 @@ export function Header() {
   return (
     <header className="flex h-14 items-center justify-between border-b bg-background px-4 lg:px-6">
       <div className="flex items-center gap-4">
-        <MobileSidebar />
+        <MobileSidebar badges={badges} />
         <h2 className="text-lg font-semibold">{title}</h2>
       </div>
       <ThemeToggle />

@@ -6,7 +6,11 @@ import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { Sidebar } from "./sidebar";
 
-export function MobileSidebar() {
+interface MobileSidebarProps {
+  badges?: { revisoes?: number };
+}
+
+export function MobileSidebar({ badges }: MobileSidebarProps) {
   const [open, setOpen] = useState(false);
 
   return (
@@ -25,7 +29,7 @@ export function MobileSidebar() {
         <SheetContent side="left" className="w-64 p-0">
           <SheetTitle className="sr-only">Menu de navegação</SheetTitle>
           <div onClick={() => setOpen(false)}>
-            <Sidebar />
+            <Sidebar badges={badges} />
           </div>
         </SheetContent>
       </Sheet>

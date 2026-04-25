@@ -8,8 +8,11 @@ import {
   PRIORIDADE_SCORE,
   DIFICULDADE_SCORE,
   STATUS_SCORE,
+  REVISAO_1_DIAS,
+  REVISAO_2_DIAS,
 } from "@/lib/constants";
 import type { ActionResult, PlannedSession, Topic, Subject } from "@/types";
+import { getDueReviewsForWeek } from "./revisoes";
 
 // ─── Helpers ────────────────────────────────────────────────
 
@@ -167,6 +170,17 @@ export async function generateSchedule(
 
   const completedThisWeek = existingCompleted.filter((s) => weekDates.includes(s.data));
 
+  // Pending sessions in this week that we want to PRESERVE (existing reviews)
+  const pendingAll = await db
+    .select()
+    .from(plannedSessions)
+    .where(and(eq(plannedSessions.planningId, planningId), eq(plannedSessions.status, "pendente")));
+
+  const pendingThisWeek = pendingAll.filter((s) => weekDates.includes(s.data));
+  const preservedReviews = pendingThisWeek.filter(
+    (s) => s.tipoSessao === "revisao_1" || s.tipoSessao === "revisao_2"
+  );
+
   const days: DayBudget[] = availMinPerDay.map((availMin, i) => ({
     index: i,
     date: weekDates[i],
@@ -181,9 +195,48 @@ export async function generateSchedule(
     if (day) day.usedMin += session.duracaoMin;
   }
 
+  // Account for preserved reviews: subtract their duration from day budget
+  // (they're not added to day.sessions because they already exist in DB and shouldn't be re-inserted)
+  for (const session of preservedReviews) {
+    const day = days[session.diaSemana];
+    if (day) day.usedMin += session.duracaoMin;
+  }
+
   const completedTopicIds = new Set(
     completedThisWeek.filter((s) => s.tipoSessao === "estudo").map((s) => s.topicId)
   );
+
+  // Inject due reviews (overdue or due this week) that aren't already scheduled
+  const dueReviews = await getDueReviewsForWeek(planningId, weekDates);
+  for (const review of dueReviews) {
+    // Find the day matching targetDate
+    let dayIdx = weekDates.indexOf(review.targetDate);
+    if (dayIdx < 0) dayIdx = 0;
+
+    // If the target day doesn't fit, search forward
+    let placed = false;
+    for (let attempt = 0; attempt < 7 && !placed; attempt++) {
+      const idx = (dayIdx + attempt) % 7;
+      const day = days[idx];
+      if (day.availableMin - day.usedMin >= review.duracaoMin) {
+        day.sessions.push({
+          planningId,
+          data: day.date,
+          diaSemana: idx,
+          subjectId: review.subjectId,
+          topicId: review.topicId,
+          tipoSessao: review.tipoSessao,
+          duracaoMin: review.duracaoMin,
+          ordemNoDia: day.sessions.length + 1,
+          status: "pendente",
+        });
+        day.usedMin += review.duracaoMin;
+        day.subjectIds.add(review.subjectId);
+        placed = true;
+      }
+    }
+    // If no day has space, the review is left for the user to schedule manually
+  }
 
   // 4. Distribute study sessions with subject diversity per day
   // Supports splitting topics across multiple days when they don't fit in a single slot
@@ -311,9 +364,9 @@ export async function generateSchedule(
     day.sessions = sorted;
   }
 
-  // 6. Note: Reviews are NOT scheduled in the same week anymore
-  // Rev1 = 10 days after study, Rev2 = 35 days after Rev1
-  // These will be created when sessions are completed (see completeSession)
+  // 6. Reviews are anchored to the topic's studyCompletedAt (Rev 1 = +10d, Rev 2 = +30d).
+  // The scheduler injects due/overdue reviews into the week (step 3) and creates
+  // future review sessions on demand inside completeSession.
 
   // 7. Persist
   const allNewSessions = days.flatMap((d) => d.sessions);
@@ -322,16 +375,13 @@ export async function generateSchedule(
     return { success: false, error: "Não foi possível gerar sessões. Verifique a disponibilidade e os subtópicos cadastrados." };
   }
 
-  // Delete pending sessions for this week
-  const pendingThisWeek = await db
-    .select()
-    .from(plannedSessions)
-    .where(and(eq(plannedSessions.planningId, planningId), eq(plannedSessions.status, "pendente")));
+  // Delete only pending ESTUDO sessions for this week (preserve existing reviews)
+  const pendingEstudoIdsThisWeek = pendingThisWeek
+    .filter((s) => s.tipoSessao === "estudo")
+    .map((s) => s.id);
 
-  const pendingIdsThisWeek = pendingThisWeek.filter((s) => weekDates.includes(s.data)).map((s) => s.id);
-
-  if (pendingIdsThisWeek.length > 0) {
-    await db.delete(plannedSessions).where(inArray(plannedSessions.id, pendingIdsThisWeek));
+  if (pendingEstudoIdsThisWeek.length > 0) {
+    await db.delete(plannedSessions).where(inArray(plannedSessions.id, pendingEstudoIdsThisWeek));
   }
 
   // Insert new sessions
@@ -376,16 +426,18 @@ export async function completeSession(
     .where(eq(plannedSessions.id, sessionId))
     .returning();
 
-  // Update topic status based on session type
+  // Update topic status and completion timestamps based on session type
+  const now = new Date();
+
   if (session.tipoSessao === "estudo") {
-    // Study completed → topic goes to "revisando"
+    // Study completed → topic goes to "revisando", record studyCompletedAt
     await db
       .update(topics)
-      .set({ status: "revisando", updatedAt: new Date() })
+      .set({ status: "revisando", studyCompletedAt: now, updatedAt: now })
       .where(eq(topics.id, session.topicId));
 
-    // Schedule Revisão 1 in 10 days (50% duration)
-    const rev1Date = addDays(new Date(), 10);
+    // Schedule Revisão 1 anchored at study completion + REVISAO_1_DIAS
+    const rev1Date = addDays(now, REVISAO_1_DIAS);
     const rev1DayOfWeek = (rev1Date.getDay() + 6) % 7; // 0=Monday
     const rev1Duration = Math.max(10, Math.ceil(session.duracaoMin * 0.5));
 
@@ -401,14 +453,25 @@ export async function completeSession(
       status: "pendente",
     });
   } else if (session.tipoSessao === "revisao_1") {
-    // Revisão 1 completed → schedule Revisão 2 in 35 days (30% of original study time)
-    const rev2Date = addDays(new Date(), 35);
-    const rev2DayOfWeek = (rev2Date.getDay() + 6) % 7;
-    const rev2Duration = Math.max(10, Math.ceil(session.duracaoMin * 0.6)); // 60% of rev1 = ~30% of original
+    // Rev 1 completed → record revisao1CompletedAt, schedule Rev 2 anchored at study + REVISAO_2_DIAS
+    const [topic] = await db
+      .update(topics)
+      .set({ revisao1CompletedAt: now, updatedAt: now })
+      .where(eq(topics.id, session.topicId))
+      .returning();
+
+    // Anchor Rev 2 at studyCompletedAt + REVISAO_2_DIAS, fallback to now + (REVISAO_2_DIAS - REVISAO_1_DIAS)
+    const anchor = topic?.studyCompletedAt ?? addDays(now, -REVISAO_1_DIAS);
+    const rev2Date = addDays(anchor, REVISAO_2_DIAS);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const finalRev2Date = rev2Date < today ? today : rev2Date;
+    const rev2DayOfWeek = (finalRev2Date.getDay() + 6) % 7;
+    const rev2Duration = Math.max(10, Math.ceil(session.duracaoMin * 0.6));
 
     await db.insert(plannedSessions).values({
       planningId: session.planningId,
-      data: formatDate(rev2Date),
+      data: formatDate(finalRev2Date),
       diaSemana: rev2DayOfWeek,
       subjectId: session.subjectId,
       topicId: session.topicId,
@@ -418,10 +481,10 @@ export async function completeSession(
       status: "pendente",
     });
   } else if (session.tipoSessao === "revisao_2") {
-    // Revisão 2 completed → topic is fully "concluido"
+    // Rev 2 completed → topic is fully "concluido", record revisao2CompletedAt
     await db
       .update(topics)
-      .set({ status: "concluido", updatedAt: new Date() })
+      .set({ status: "concluido", revisao2CompletedAt: now, updatedAt: now })
       .where(eq(topics.id, session.topicId));
   }
 
@@ -451,15 +514,16 @@ export async function uncompleteSession(
     .returning();
 
   // Revert topic status and remove future reviews
+  const now = new Date();
+
   if (session.tipoSessao === "estudo") {
     // Study was marked complete → topic went to "revisando", rev1 was scheduled
-    // Revert topic to "em_andamento" and delete pending rev1
+    // Revert topic to "em_andamento", clear studyCompletedAt, delete pending rev1
     await db
       .update(topics)
-      .set({ status: "em_andamento", updatedAt: new Date() })
+      .set({ status: "em_andamento", studyCompletedAt: null, updatedAt: now })
       .where(eq(topics.id, session.topicId));
 
-    // Delete pending revisao_1 for this topic
     await db
       .delete(plannedSessions)
       .where(
@@ -471,10 +535,10 @@ export async function uncompleteSession(
       );
   } else if (session.tipoSessao === "revisao_1") {
     // Rev1 was marked complete → rev2 was scheduled
-    // Revert topic to "revisando" and delete pending rev2
+    // Revert topic to "revisando", clear revisao1CompletedAt, delete pending rev2
     await db
       .update(topics)
-      .set({ status: "revisando", updatedAt: new Date() })
+      .set({ status: "revisando", revisao1CompletedAt: null, updatedAt: now })
       .where(eq(topics.id, session.topicId));
 
     await db
@@ -488,10 +552,10 @@ export async function uncompleteSession(
       );
   } else if (session.tipoSessao === "revisao_2") {
     // Rev2 was marked complete → topic went to "concluido"
-    // Revert topic to "revisando"
+    // Revert topic to "revisando", clear revisao2CompletedAt
     await db
       .update(topics)
-      .set({ status: "revisando", updatedAt: new Date() })
+      .set({ status: "revisando", revisao2CompletedAt: null, updatedAt: now })
       .where(eq(topics.id, session.topicId));
   }
 
