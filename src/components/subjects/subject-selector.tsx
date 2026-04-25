@@ -1,7 +1,7 @@
 "use client";
 
 import { Badge } from "@/components/ui/badge";
-import { PRIORIDADE_LABELS } from "@/lib/constants";
+import { PRIORIDADE_LABELS, getSubjectColor } from "@/lib/constants";
 import { cn } from "@/lib/utils";
 import type { SubjectWithTopics } from "@/types";
 
@@ -90,7 +90,16 @@ export function SubjectSelector({
                 )}
               </div>
               <div className="min-w-0 flex-1">
-                <p className="text-sm font-medium truncate">{subject.nome}</p>
+                <div className="flex items-center gap-1.5">
+                  <span
+                    className={cn(
+                      "h-2.5 w-2.5 shrink-0 rounded-full",
+                      getSubjectColor(subject.cor).swatch
+                    )}
+                    aria-hidden="true"
+                  />
+                  <p className="text-sm font-medium truncate">{subject.nome}</p>
+                </div>
                 <div className="mt-1 flex items-center gap-2">
                   <Badge
                     variant="secondary"

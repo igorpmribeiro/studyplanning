@@ -2,7 +2,9 @@
 
 import { db } from "@/db";
 import { subjects, topics } from "@/db/schema";
+import { eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
+import { SUBJECT_COLOR_KEYS } from "@/lib/constants";
 import type { ActionResult } from "@/types";
 
 interface ImportResult {
@@ -34,6 +36,14 @@ export async function importFromSpreadsheet(
     let totalMaterias = 0;
     let totalSubtopicos = 0;
     const details: string[] = [];
+
+    // Cycle palette colors starting after the existing subjects so newly-imported
+    // matérias get distinct colors instead of stacking on the same one.
+    const existingCount = await db
+      .select({ id: subjects.id })
+      .from(subjects)
+      .where(eq(subjects.planningId, planningId));
+    let colorOffset = existingCount.length;
 
     for (const sheetName of workbook.SheetNames) {
       const worksheet = workbook.Sheets[sheetName];
@@ -71,11 +81,14 @@ export async function importFromSpreadsheet(
       if (subtopicNames.length === 0) continue;
 
       // Create the subject (matéria)
+      const cor = SUBJECT_COLOR_KEYS[colorOffset % SUBJECT_COLOR_KEYS.length];
+      colorOffset++;
       const [subject] = await db
         .insert(subjects)
         .values({
           planningId,
           nome: sheetName.trim(),
+          cor,
           prioridade: "media",
           peso: 6,
           observacoes: `Importado da planilha "${file.name}"`,

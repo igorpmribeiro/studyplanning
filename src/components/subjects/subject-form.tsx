@@ -1,12 +1,19 @@
 "use client";
 
-import { useTransition } from "react";
+import { useState, useTransition } from "react";
+import { Check } from "lucide-react";
 import { createSubject, updateSubject } from "@/actions/subjects";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
+import {
+  SUBJECT_COLORS,
+  SUBJECT_COLOR_KEYS,
+  type SubjectColorKey,
+} from "@/lib/constants";
+import { cn } from "@/lib/utils";
 import type { Subject } from "@/types";
 
 interface SubjectFormProps {
@@ -18,11 +25,15 @@ interface SubjectFormProps {
 export function SubjectForm({ planningId, subject, onSuccess }: SubjectFormProps) {
   const [isPending, startTransition] = useTransition();
   const isEditing = !!subject;
+  const [color, setColor] = useState<SubjectColorKey>(
+    (subject?.cor as SubjectColorKey | undefined) ?? "blue"
+  );
 
   function handleSubmit(formData: FormData) {
     if (!isEditing) {
       formData.set("planningId", planningId);
     }
+    formData.set("cor", color);
 
     startTransition(async () => {
       const result = isEditing
@@ -49,6 +60,38 @@ export function SubjectForm({ planningId, subject, onSuccess }: SubjectFormProps
           defaultValue={subject?.nome ?? ""}
           required
         />
+      </div>
+
+      <div className="space-y-2">
+        <Label>Cor</Label>
+        <div className="flex flex-wrap gap-2">
+          {SUBJECT_COLOR_KEYS.map((key) => {
+            const palette = SUBJECT_COLORS[key];
+            const selected = color === key;
+            return (
+              <button
+                key={key}
+                type="button"
+                aria-label={palette.label}
+                aria-pressed={selected}
+                onClick={() => setColor(key)}
+                className={cn(
+                  "relative h-8 w-8 rounded-full transition-all hover:scale-110 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+                  palette.swatch,
+                  selected && "ring-2 ring-ring ring-offset-2"
+                )}
+                title={palette.label}
+              >
+                {selected && (
+                  <Check className="absolute inset-0 m-auto h-4 w-4 text-white" aria-hidden="true" />
+                )}
+              </button>
+            );
+          })}
+        </div>
+        <p className="text-xs text-muted-foreground">
+          A cor é usada no cronograma e nos cards para diferenciar matérias.
+        </p>
       </div>
 
       <div className="grid grid-cols-2 gap-4">

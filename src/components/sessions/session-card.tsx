@@ -9,7 +9,7 @@ import { EditSessionTopic } from "./edit-session-topic";
 import { SessionTimer } from "./session-timer";
 import { SessionNotes } from "./session-notes";
 import { toast } from "sonner";
-import { TIPO_SESSAO_LABELS } from "@/lib/constants";
+import { TIPO_SESSAO_LABELS, getSubjectColor } from "@/lib/constants";
 import type { PlannedSession, Subject, Topic } from "@/types";
 import { cn } from "@/lib/utils";
 
@@ -17,12 +17,6 @@ const tipoColors = {
   estudo: "bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-900 dark:text-blue-300 dark:border-blue-800",
   revisao_1: "bg-green-100 text-green-800 border-green-200 dark:bg-green-900 dark:text-green-300 dark:border-green-800",
   revisao_2: "bg-purple-100 text-purple-800 border-purple-200 dark:bg-purple-900 dark:text-purple-300 dark:border-purple-800",
-} as const;
-
-const tipoBorderColors = {
-  estudo: "border-l-blue-500",
-  revisao_1: "border-l-green-500",
-  revisao_2: "border-l-purple-500",
 } as const;
 
 interface SessionCardProps {
@@ -36,6 +30,7 @@ interface SessionCardProps {
 export function SessionCard({ session, subject, topic, allSubjects, allTopics }: SessionCardProps) {
   const [isPending, startTransition] = useTransition();
   const isCompleted = session.status === "concluida";
+  const palette = getSubjectColor(subject?.cor);
 
   function handleToggle() {
     startTransition(async () => {
@@ -46,7 +41,7 @@ export function SessionCard({ session, subject, topic, allSubjects, allTopics }:
       if (result.success) {
         const messages: Record<string, string> = {
           estudo: "Estudo concluído! Revisão 1 agendada para daqui 10 dias.",
-          revisao_1: "Revisão 1 concluída! Revisão 2 agendada para daqui 20 dias.",
+          revisao_1: "Revisão 1 concluída! Revisão 2 agendada para daqui 30 dias.",
           revisao_2: "Revisão 2 concluída! Subtópico marcado como concluído.",
         };
         toast.success(
@@ -75,15 +70,21 @@ export function SessionCard({ session, subject, topic, allSubjects, allTopics }:
     <div
       className={cn(
         "group rounded-lg border border-l-4 p-3 transition-colors",
-        tipoBorderColors[session.tipoSessao],
+        palette.border,
         isCompleted && "opacity-60"
       )}
     >
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0 flex-1">
-          <p className={cn("text-sm font-medium truncate", isCompleted && "line-through")}>
-            {subject?.nome ?? "\u2014"}
-          </p>
+          <div className="flex items-center gap-1.5">
+            <span
+              className={cn("h-2.5 w-2.5 shrink-0 rounded-full", palette.swatch)}
+              aria-hidden="true"
+            />
+            <p className={cn("text-sm font-medium truncate", isCompleted && "line-through")}>
+              {subject?.nome ?? "\u2014"}
+            </p>
+          </div>
           <div className="flex items-center gap-1">
             <p className={cn("text-xs text-muted-foreground truncate", isCompleted && "line-through")}>
               {topic?.nome ?? "\u2014"}
@@ -112,9 +113,11 @@ export function SessionCard({ session, subject, topic, allSubjects, allTopics }:
         <div className="flex flex-col gap-1 shrink-0">
           {!isCompleted && (
             <SessionTimer
+              sessionId={session.id}
               durationMin={session.duracaoMin}
               subjectName={subject?.nome ?? "\u2014"}
               topicName={topic?.nome ?? "\u2014"}
+              subjectColorKey={subject?.cor}
               onComplete={handleToggle}
             />
           )}

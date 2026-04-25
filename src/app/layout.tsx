@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import { Toaster } from "@/components/ui/sonner";
 import { ThemeProvider } from "@/components/theme-provider";
 import { AppShell } from "@/components/layout/app-shell";
+import { TimerProvider } from "@/components/sessions/timer-provider";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -45,7 +46,9 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          <AppShell>{children}</AppShell>
+          <TimerProvider>
+            <AppShell>{children}</AppShell>
+          </TimerProvider>
           <Toaster richColors position="top-right" />
         </ThemeProvider>
       </body>

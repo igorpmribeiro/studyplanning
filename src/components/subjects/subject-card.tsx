@@ -7,7 +7,8 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { deleteSubject } from "@/actions/subjects";
 import { toast } from "sonner";
-import { PRIORIDADE_LABELS } from "@/lib/constants";
+import { PRIORIDADE_LABELS, getSubjectColor } from "@/lib/constants";
+import { cn } from "@/lib/utils";
 import type { SubjectWithTopics } from "@/types";
 
 const prioridadeColors = {
@@ -23,6 +24,7 @@ interface SubjectCardProps {
 
 export function SubjectCard({ subject, onEdit }: SubjectCardProps) {
   const [isPending, startTransition] = useTransition();
+  const palette = getSubjectColor(subject.cor);
 
   function handleDelete() {
     if (!confirm(`Excluir "${subject.nome}"? Todos os subtópicos serão removidos.`)) return;
@@ -38,10 +40,19 @@ export function SubjectCard({ subject, onEdit }: SubjectCardProps) {
   }
 
   return (
-    <div className="group rounded-xl border bg-card p-5 text-card-foreground shadow-sm transition-shadow hover:shadow-md">
+    <div
+      className={cn(
+        "group rounded-xl border border-l-4 bg-card p-5 text-card-foreground shadow-sm transition-shadow hover:shadow-md",
+        palette.border
+      )}
+    >
       <div className="flex items-start justify-between gap-3">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-1">
+            <span
+              className={cn("h-3 w-3 shrink-0 rounded-full", palette.swatch)}
+              aria-hidden="true"
+            />
             <h3 className="font-semibold truncate">{subject.nome}</h3>
             <Badge
               variant="secondary"

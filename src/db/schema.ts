@@ -64,6 +64,7 @@ export const subjects = pgTable("subjects", {
     .references(() => plannings.id, { onDelete: "cascade" }),
   concursoId: uuid("concurso_id").references(() => concursos.id, { onDelete: "set null" }),
   nome: text("nome").notNull(),
+  cor: text("cor").notNull().default("blue"),
   prioridade: prioridadeEnum("prioridade").notNull().default("media"),
   peso: integer("peso").notNull().default(5),
   observacoes: text("observacoes").default(""),

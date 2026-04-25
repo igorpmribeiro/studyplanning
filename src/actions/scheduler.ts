@@ -99,15 +99,15 @@ export async function generateSchedule(
     return { success: false, error: "Cadastre pelo menos uma matéria com subtópicos." };
   }
 
-  // 2. Score topics PER SUBJECT, then build round-robin queue
+  // 2. Score topics PER SUBJECT in strict xlsx (ordem) order.
+  // Only topics still pending estudo are queued — `revisando` and `concluido`
+  // topics had their study completed, so they don't need new "estudo" sessions
+  // (their reviews are scheduled separately based on studyCompletedAt).
   const topicsBySubject: Map<string, ScoredTopic[]> = new Map();
 
   for (const subject of allSubjects) {
-    // Topics arrive pre-sorted by `ordem` (import order = prerequisite order).
-    // We only filter out completed topics; we keep the original order so that
-    // prerequisite topics are scheduled before advanced ones.
     const scored = subject.topics
-      .filter((t) => t.status !== "concluido")
+      .filter((t) => t.status === "nao_iniciado" || t.status === "em_andamento")
       .map((t) => {
         const prioridadeNum = PRIORIDADE_SCORE[subject.prioridade as keyof typeof PRIORIDADE_SCORE] ?? 2;
         const dificuldadeNum = DIFICULDADE_SCORE[t.dificuldade as keyof typeof DIFICULDADE_SCORE] ?? 2;
@@ -238,53 +238,65 @@ export async function generateSchedule(
     // If no day has space, the review is left for the user to schedule manually
   }
 
-  // 4. Distribute study sessions with subject diversity per day
-  // Supports splitting topics across multiple days when they don't fit in a single slot
+  // 4. Distribute study sessions, enforcing strict per-subject xlsx order:
+  // a topic is never placed on a day earlier than the previous topic from the
+  // same subject. This guarantees that line N is studied before line N+1.
+  // Supports splitting topics across multiple days when they don't fit in a single slot.
   const MIN_SESSION_DURATION = 15; // minimum session size when splitting (minutes)
   const reviewQueue: Array<{ topic: Topic; subject: Subject; studyDayIndex: number }> = [];
-  let dayPointer = 0; // round-robin across days too
+  // Per-subject earliest day the next topic may occupy (forward-only pointer).
+  // Seed it with already-completed estudo sessions so a re-generation mid-week
+  // doesn't move the next topic to a day before what was already studied.
+  const subjectMinDay = new Map<string, number>();
+  for (const session of completedThisWeek) {
+    if (session.tipoSessao === "estudo") {
+      const prev = subjectMinDay.get(session.subjectId) ?? -1;
+      if (session.diaSemana > prev) {
+        subjectMinDay.set(session.subjectId, session.diaSemana);
+      }
+    }
+  }
 
   for (const { topic, subject } of interleavedTopics) {
     if (completedTopicIds.has(topic.id)) continue;
 
+    const startDay = subjectMinDay.get(subject.id) ?? 0;
     let remainingDuration = topic.tempoEstimadoMin;
-    let partNumber = 0;
     let placed = false;
+    let lastDayUsed = -1;
 
-    // Try to place the full topic in one day first (diversity-aware)
-    for (let attempt = 0; attempt < 7; attempt++) {
-      const dayIdx = (dayPointer + attempt) % 7;
+    // Try to place the full topic in one day (diversity-aware)
+    for (let dayIdx = startDay; dayIdx < 7; dayIdx++) {
       const day = days[dayIdx];
       const remaining = day.availableMin - day.usedMin;
+      if (remaining < topic.tempoEstimadoMin) continue;
 
-      if (remaining >= topic.tempoEstimadoMin) {
-        const sameSubjectCount = day.sessions.filter((s) => s.subjectId === subject.id).length;
-        if (sameSubjectCount >= 2) continue;
+      const sameSubjectCount = day.sessions.filter((s) => s.subjectId === subject.id).length;
+      if (sameSubjectCount >= 2) continue;
 
-        day.sessions.push({
-          planningId,
-          data: day.date,
-          diaSemana: dayIdx,
-          subjectId: subject.id,
-          topicId: topic.id,
-          tipoSessao: "estudo",
-          duracaoMin: topic.tempoEstimadoMin,
-          ordemNoDia: day.sessions.length + 1,
-          status: "pendente",
-        });
+      day.sessions.push({
+        planningId,
+        data: day.date,
+        diaSemana: dayIdx,
+        subjectId: subject.id,
+        topicId: topic.id,
+        tipoSessao: "estudo",
+        duracaoMin: topic.tempoEstimadoMin,
+        ordemNoDia: day.sessions.length + 1,
+        status: "pendente",
+      });
 
-        day.usedMin += topic.tempoEstimadoMin;
-        day.subjectIds.add(subject.id);
-        reviewQueue.push({ topic, subject, studyDayIndex: dayIdx });
-        dayPointer = (dayIdx + 1) % 7;
-        placed = true;
-        break;
-      }
+      day.usedMin += topic.tempoEstimadoMin;
+      day.subjectIds.add(subject.id);
+      reviewQueue.push({ topic, subject, studyDayIndex: dayIdx });
+      lastDayUsed = dayIdx;
+      placed = true;
+      break;
     }
 
-    // Fallback: try any day with full space (no diversity limit)
+    // Fallback: any day with full space (no diversity limit), still forward-only
     if (!placed) {
-      for (let dayIdx = 0; dayIdx < 7; dayIdx++) {
+      for (let dayIdx = startDay; dayIdx < 7; dayIdx++) {
         const day = days[dayIdx];
         if (day.availableMin - day.usedMin >= topic.tempoEstimadoMin) {
           day.sessions.push({
@@ -301,24 +313,24 @@ export async function generateSchedule(
           day.usedMin += topic.tempoEstimadoMin;
           day.subjectIds.add(subject.id);
           reviewQueue.push({ topic, subject, studyDayIndex: dayIdx });
+          lastDayUsed = dayIdx;
           placed = true;
           break;
         }
       }
     }
 
-    // Split: topic doesn't fit in any single day — split across multiple days
+    // Split: topic doesn't fit in any single day — split across multiple days,
+    // still respecting the subject's forward-only pointer.
     if (!placed) {
       const splitDays: number[] = [];
 
-      for (let attempt = 0; attempt < 7 && remainingDuration > 0; attempt++) {
-        const dayIdx = (dayPointer + attempt) % 7;
+      for (let dayIdx = startDay; dayIdx < 7 && remainingDuration > 0; dayIdx++) {
         const day = days[dayIdx];
         const dayRemaining = day.availableMin - day.usedMin;
 
         if (dayRemaining >= MIN_SESSION_DURATION) {
           const sessionDuration = Math.min(dayRemaining, remainingDuration);
-          partNumber++;
 
           day.sessions.push({
             planningId,
@@ -336,13 +348,18 @@ export async function generateSchedule(
           day.subjectIds.add(subject.id);
           remainingDuration -= sessionDuration;
           splitDays.push(dayIdx);
+          lastDayUsed = dayIdx;
         }
       }
 
       if (splitDays.length > 0) {
         reviewQueue.push({ topic, subject, studyDayIndex: splitDays[0] });
-        dayPointer = (splitDays[splitDays.length - 1] + 1) % 7;
       }
+    }
+
+    if (lastDayUsed >= 0) {
+      // Next topic from this subject can land on the same day or later
+      subjectMinDay.set(subject.id, lastDayUsed);
     }
   }
 
